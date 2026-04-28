@@ -1,0 +1,49 @@
+/**
+ * Loremail Cloudflare Worker
+ * Central auth, game creation, invite, join, and trigger endpoints.
+ */
+
+import { handleCreateGame } from './routes/create-game.js';
+import { handleInvite } from './routes/invite.js';
+import { handleJoin } from './routes/join.js';
+import { handleTrigger } from './routes/trigger.js';
+import { handleGetPlayer } from './routes/get-player.js';
+import { handlePatchConfig } from './routes/patch-config.js';
+import { handleRegenerateInvite } from './routes/regenerate-invite.js';
+import { handleDeletePlayer } from './routes/delete-player.js';
+import { corsHeaders, handleCors } from './lib/cors.js';
+
+export default {
+  async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return handleCors();
+    }
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    try {
+      if (method === 'POST' && path === '/game/create') return handleCreateGame(request, env);
+      if (method === 'POST' && path === '/game/invite') return handleInvite(request, env);
+      if (method === 'POST' && path === '/game/join') return handleJoin(request, env);
+      if (method === 'POST' && path === '/game/trigger') return handleTrigger(request, env);
+      if (method === 'GET' && path === '/game/player') return handleGetPlayer(request, env);
+      if (method === 'PATCH' && path === '/game/config') return handlePatchConfig(request, env);
+      if (method === 'POST' && path === '/game/regenerate-invite') return handleRegenerateInvite(request, env);
+      if (method === 'DELETE' && path === '/game/player') return handleDeletePlayer(request, env);
+
+      return json({ error: 'Not found' }, 404);
+    } catch (err) {
+      console.error('Worker error:', err);
+      return json({ error: err.message ?? 'Internal server error' }, 500);
+    }
+  },
+};
+
+export function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
+}

@@ -1,0 +1,156 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Octokit } from '@octokit/rest';
+import matter from 'gray-matter';
+
+/**
+ * useGameData — fetches all game data from the GitHub repo.
+ * Caches in memory, refreshes on mount and tab focus.
+ */
+export function useGameData(session) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const cacheRef = useRef(null);
+
+  const refresh = useCallback(async () => {
+    if (!session?.githubToken || !session?.repoOwner || !session?.repoName) return;
+    setLoading(true);
+    try {
+      const fetched = await fetchGameData(session);
+      cacheRef.current = fetched;
+      setData(fetched);
+    } catch (e) {
+      console.error('Failed to fetch game data:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (session) refresh();
+  }, [session, refresh]);
+
+  return { data, loading, refresh };
+}
+
+async function fetchGameData(session) {
+  const octokit = new Octokit({ auth: session.githubToken });
+  const { repoOwner: owner, repoName: repo, playerId, isFounder } = session;
+
+  const getContent = async (path) => {
+    try {
+      const res = await octokit.repos.getContent({ owner, repo, path });
+      return atob(res.data.content.replace(/\n/g, ''));
+    } catch { return null; }
+  };
+
+  const listDir = async (path) => {
+    try {
+      const res = await octokit.repos.getContent({ owner, repo, path });
+      return Array.isArray(res.data) ? res.data : [];
+    } catch { return []; }
+  };
+
+  // Fetch all in parallel
+  const [
+    gameJsonRaw,
+    canonRaw,
+    eventsRaw,
+    statusRaw,
+    chronicleRaw,
+    gmNotesRaw,
+    factsRaw,
+    pendingFiles,
+    deliveredFiles,
+  ] = await Promise.all([
+    getContent('config/game.json'),
+    getContent('world/canon.md'),
+    getContent('world/events.md'),
+    getContent('.gm-status.json'),
+    isFounder ? getContent('world/chronicle.md') : Promise.resolve(null),
+    isFounder ? getContent('world/gm-notes.md') : Promise.resolve(null),
+    isFounder ? getContent('world/canon-facts.md') : Promise.resolve(null),
+    listDir('letters/pending'),
+    listDir('letters/delivered'),
+  ]);
+
+  const game = gameJsonRaw ? JSON.parse(gameJsonRaw) : null;
+  const gmStatus = statusRaw ? JSON.parse(statusRaw) : null;
+
+  // Parse delivered letters
+  const myDelivered = [];
+  for (const file of deliveredFiles) {
+    if (!file.name.endsWith('.md') || file.name === '.gitkeep') continue;
+    const parts = file.name.replace('.md', '').split('_');
+    const [deliverAt, from, to] = parts;
+    if (from === playerId || to === playerId) {
+      const raw = await getContent(`letters/delivered/${file.name}`);
+      if (!raw) continue;
+      const parsed = matter(raw);
+      if (parsed.data.to === playerId || parsed.data.from === playerId) {
+        myDelivered.push({
+          id: file.name,
+          from: parsed.data.from,
+          to: parsed.data.to,
+          sentAt: parsed.data.sent_at,
+          deliverAt: parsed.data.deliver_at,
+          body: parsed.content.trim(),
+          arrivedLabel: formatRelative(parsed.data.deliver_at),
+        });
+      }
+    }
+  }
+
+  // Parse pending letters for "in transit" display
+  const myPending = [];
+  for (const file of pendingFiles) {
+    if (!file.name.endsWith('.md') || file.name === '.gitkeep') continue;
+    const parts = file.name.replace('.md', '').split('_');
+    const [deliverAt, from, to] = parts;
+    if (from === playerId || to === playerId) {
+      myPending.push({
+        id: file.name,
+        from,
+        to,
+        deliverAt: parseInt(deliverAt),
+        hoursRemaining: Math.max(0, Math.ceil((parseInt(deliverAt) - Date.now() / 1000) / 3600)),
+      });
+    }
+  }
+
+  // Fetch character data for all players
+  const characters = {};
+  if (game?.players) {
+    await Promise.all(
+      game.players.filter(p => p.joined && !p.removed).map(async (p) => {
+        const [char, loc] = await Promise.all([
+          getContent(`players/${p.id}/character.md`),
+          getContent(`players/${p.id}/location.md`),
+        ]);
+        characters[p.id] = { character: char, location: loc, name: p.character };
+      }),
+    );
+  }
+
+  return {
+    game,
+    canon: canonRaw,
+    events: eventsRaw,
+    gmStatus,
+    chronicle: chronicleRaw,
+    gmNotes: gmNotesRaw,
+    facts: factsRaw,
+    deliveredLetters: myDelivered.sort((a, b) => b.deliverAt - a.deliverAt),
+    pendingLetters: myPending,
+    characters,
+  };
+}
+
+function formatRelative(unixTs) {
+  if (!unixTs) return '';
+  const now = Date.now() / 1000;
+  const diff = now - unixTs;
+  if (diff < 60) return 'arrived just now';
+  if (diff < 3600) return `arrived ${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `arrived ${Math.floor(diff / 3600)} hours ago`;
+  return `arrived ${Math.floor(diff / 86400)} days ago`;
+}

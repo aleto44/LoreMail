@@ -1,0 +1,251 @@
+/* ── Loremail Launcher Styles ── */
+:root {
+  --ink: #1a1410;
+  --paper: #f5f0e8;
+  --faded: #8a7d6a;
+  --accent: #7a3b1e;
+  --border: #d4c9b4;
+  --card: #ede8dd;
+  --max-w: 540px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px 80px;
+}
+
+#app {
+  width: 100%;
+  max-width: var(--max-w);
+}
+
+.loremail-title {
+  font-family: 'IM Fell English', serif;
+  letter-spacing: 0.25em;
+  font-size: 22px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.loremail-sub {
+  text-align: center;
+  color: var(--faded);
+  font-size: 13px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.step-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 32px 32px 28px;
+  margin-top: 28px;
+}
+
+.step-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--faded);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+textarea, input[type="text"], input[type="password"], select {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+textarea:focus, input:focus, select:focus {
+  border-color: var(--accent);
+}
+
+textarea { resize: vertical; min-height: 100px; }
+
+.field { margin-bottom: 20px; }
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.chip {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--paper);
+  color: var(--faded);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.selected { background: var(--accent); border-color: var(--accent); color: white; }
+
+.btn-primary {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: opacity 0.15s;
+  margin-top: 8px;
+}
+
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-secondary {
+  display: inline-block;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-secondary:hover { border-color: var(--ink); }
+
+.passphrase-display {
+  text-align: center;
+  font-family: 'IM Fell English', serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  margin: 16px 0;
+}
+
+.invite-link-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+
+.invite-link-box span {
+  flex: 1;
+  font-size: 12px;
+  color: var(--faded);
+  word-break: break-all;
+}
+
+.invite-link-box button {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--ink);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.row-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.row-btns > * { flex: 1; }
+
+.error-msg {
+  color: #c0392b;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.step-indicator {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+.step-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.2s;
+}
+
+.step-dot.active { background: var(--accent); }
+
+.loading {
+  text-align: center;
+  color: var(--faded);
+  font-style: italic;
+  padding: 20px;
+}
+
+.github-oauth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  background: #24292f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.github-oauth-btn:hover { background: #1a1f24; }
+
+.github-oauth-btn svg { width: 20px; height: 20px; fill: white; }
+
+.model-select { margin-top: 4px; }
+
+.info-note {
+  font-size: 12px;
+  color: var(--faded);
+  font-style: italic;
+  margin-top: 6px;
+}

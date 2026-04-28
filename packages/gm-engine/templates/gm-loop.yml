@@ -1,0 +1,27 @@
+name: GM Loop
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      trigger:
+        description: 'letter_delivery | seed_generation | finalization'
+        default: 'letter_delivery'
+
+permissions:
+  contents: write
+
+jobs:
+  gm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: node scripts/gm.js
+        env:
+          COPILOT_TOKEN: ${{ secrets.COPILOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER: ${{ inputs.trigger || 'letter_delivery' }}

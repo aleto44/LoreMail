@@ -1,0 +1,14 @@
+{
+  "name": "loremail-gm-engine",
+  "version": "0.1.0",
+  "description": "Reusable GM engine for world-building games",
+  "main": "index.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  }
+}

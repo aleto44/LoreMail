@@ -1,0 +1,14 @@
+{
+  "name": "loremail",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:worker": "npm run dev --workspace=apps/worker",
+    "dev:launcher": "npm run dev --workspace=apps/launcher",
+    "dev:pwa": "npm run dev --workspace=apps/pwa",
+    "test:engine": "npm test --workspace=packages/gm-engine"
+  }
+}
