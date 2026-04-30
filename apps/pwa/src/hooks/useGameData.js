@@ -53,6 +53,7 @@ async function fetchGameData(session) {
   // Fetch all in parallel
   const [
     gameJsonRaw,
+    engineJsonRaw,
     canonRaw,
     eventsRaw,
     statusRaw,
@@ -64,6 +65,7 @@ async function fetchGameData(session) {
     deliveredFiles,
   ] = await Promise.all([
     getContent('config/game.json'),
+    getContent('config/engine.json'),
     getContent('world/canon.md'),
     getContent('world/events.md'),
     getContent('.gm-status.json'),
@@ -76,6 +78,7 @@ async function fetchGameData(session) {
   ]);
 
   const game = gameJsonRaw ? JSON.parse(gameJsonRaw) : null;
+  const engine = engineJsonRaw ? JSON.parse(engineJsonRaw) : null;
   const gmStatus = statusRaw ? JSON.parse(statusRaw) : null;
 
   // Parse delivered letters
@@ -152,6 +155,7 @@ async function fetchGameData(session) {
 
   return {
     game,
+    engine,
     canon: canonRaw,
     events: eventsRaw,
     gmStatus,

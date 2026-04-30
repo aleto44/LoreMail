@@ -8,7 +8,7 @@
  *   seed_generation  — generates world seed on game creation
  *   finalization     — generates chronicle.md
  */
-import { GMEngine } from './engine/index.js';
+import { GMEngine } from '../engine/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFile } from 'fs/promises';

@@ -30,6 +30,7 @@ export async function handleRegenerateInvite(request, env) {
   );
   await putGame(env, gameId, { ...game, players: updatedPlayers });
 
-  const inviteLink = `https://loremail.app/join?game=${gameId}&invite=${newToken}`;
+  const pwaUrl = (env.PWA_URL ?? 'https://loremail.app').replace(/\/$/, '');
+  const inviteLink = `${pwaUrl}/join?game=${gameId}&invite=${newToken}`;
   return json({ inviteLink });
 }

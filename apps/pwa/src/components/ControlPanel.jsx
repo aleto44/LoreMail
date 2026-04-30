@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { Octokit } from '@octokit/rest';
 
 const CANDIDATE_MODELS = [
   { id: 'openai/gpt-5.4',                  label: 'GPT-5.4' },
@@ -37,6 +38,7 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   const [gmPaused, setGmPaused] = useState(data?.game?.gm_paused ?? false);
   const [model, setModel] = useState(data?.game?.model ?? '');
   const [gmStyle, setGmStyle] = useState(data?.game?.gm_style ?? 'medium');
+  const [travelHours, setTravelHours] = useState(data?.game?.default_travel_hours ?? 24);
   const [passphrase, setPassphrase] = useState('');
   const [pat, setPat] = useState('');
   const [verifiedModels, setVerifiedModels] = useState([]);
@@ -44,6 +46,7 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   const [verifyStatus, setVerifyStatus] = useState('idle'); // idle | ok | fail
   const [showNotes, setShowNotes] = useState(false);
   const [showFacts, setShowFacts] = useState(false);
+  const [showLockPanel, setShowLockPanel] = useState(false);
   const [msg, setMsg] = useState('');
 
   const game = data?.game;
@@ -159,6 +162,66 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   // Canon word count
   const canonWords = (data?.canon ?? '').split(/\s+/).filter(Boolean).length;
 
+  // [DEVELOPING] entries available to promote
+  const developingEntries = (data?.canon ?? '')
+    .split('\n')
+    .filter(l => l.startsWith('### [DEVELOPING]'))
+    .map(l => l.replace(/^### \[DEVELOPING\]\s*/, '').trim());
+
+  async function promoteToLocked(entryTitle) {
+    if (!passphrase) { setMsg('Enter passphrase first.'); return; }
+    try {
+      const octokit = new Octokit({ auth: session.githubToken });
+      const { repoOwner: owner, repoName: repo } = session;
+      const res = await octokit.repos.getContent({ owner, repo, path: 'world/canon.md' });
+      const current = atob(res.data.content.replace(/\n/g, ''));
+      const escaped = entryTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const updated = current.replace(
+        new RegExp(`### \\[DEVELOPING\\] ${escaped}`, 'g'),
+        `### [LOCKED] ${entryTitle}`,
+      );
+      await octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: 'world/canon.md',
+        message: `canon: lock entry "${entryTitle}"`,
+        content: btoa(unescape(encodeURIComponent(updated))),
+        sha: res.data.sha,
+      });
+      setMsg(`"${entryTitle}" is now locked.`);
+      onRefresh();
+    } catch (e) {
+      setMsg('Failed to lock entry: ' + e.message);
+    }
+  }
+
+  async function archiveGame() {
+    if (!confirm('Archive this game? The GitHub repository will become read-only. Letters can no longer be sent or processed.')) return;
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${session.repoOwner}/${session.repoName}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${session.githubToken}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ archived: true }),
+        },
+      );
+      if (res.ok) {
+        setMsg('Game archived — the repository is now read-only.');
+      } else {
+        const d = await res.json();
+        setMsg('Archive failed: ' + (d.message ?? 'unknown error'));
+      }
+    } catch (e) {
+      setMsg('Archive failed: ' + e.message);
+    }
+  }
+
   return (
     <div>
       {/* Passphrase unlock */}
@@ -257,6 +320,29 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
           />
         </div>
 
+        <div className="control-row">
+          <label>Default Travel Time</label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input
+              type="number"
+              min={1}
+              max={720}
+              value={travelHours}
+              onChange={e => setTravelHours(Number(e.target.value))}
+              style={{ width: 64 }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--faded)' }}>hours</span>
+            <button
+              className="btn-ghost"
+              style={{ fontSize: 12, padding: '4px 8px' }}
+              onClick={() => patchConfig({ gameChanges: { default_travel_hours: travelHours } })}
+              disabled={!passphrase}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+
         <button className="control-btn" onClick={triggerGm}>Trigger GM Now</button>
         <button className="control-btn" onClick={() => setShowNotes(!showNotes)}>
           {showNotes ? 'Hide GM Notes' : 'View GM Notes'}
@@ -274,10 +360,48 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
             <ReactMarkdown>{data?.facts || '*No facts extracted yet.*'}</ReactMarkdown>
           </div>
         )}
+
+        {developingEntries.length > 0 && (
+          <>
+            <button className="control-btn" onClick={() => setShowLockPanel(!showLockPanel)}>
+              {showLockPanel ? 'Hide Canon Lock' : `Lock Canon Entries (${developingEntries.length})`}
+            </button>
+            {showLockPanel && (
+              <div style={{ padding: '8px 0' }}>
+                <p style={{ fontSize: 12, color: 'var(--faded)', marginBottom: 8, lineHeight: 1.5 }}>
+                  Promote a <code>[DEVELOPING]</code> entry to <code>[LOCKED]</code> — the GM will treat it as immutable canon.
+                </p>
+                {developingEntries.map(title => (
+                  <div key={title} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 13 }}>{title}</span>
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: 12, padding: '4px 8px' }}
+                      disabled={!passphrase}
+                      onClick={() => promoteToLocked(title)}
+                    >
+                      Lock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         <button className="control-btn" onClick={triggerChronicle}>Generate Chronicle</button>
         {data?.chronicle && (
           <button className="control-btn" onClick={onChronicle}>View Chronicle</button>
         )}
+
+        <button
+          className="control-btn"
+          style={{ color: '#c0392b', marginTop: 8 }}
+          onClick={archiveGame}
+          disabled={!session.githubToken}
+        >
+          Archive Game
+        </button>
       </div>
 
       {/* Players */}
@@ -320,7 +444,7 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
         </div>
         <div className="health-stat">
           <span>Next compress</span>
-          <strong>at {(data?.game?.engine?.canon_recent_word_limit ?? 4000).toLocaleString()} words</strong>
+          <strong>at {(data?.engine?.canon_recent_word_limit ?? 4000).toLocaleString()} words</strong>
         </div>
         <div className="health-stat">
           <span>Repo</span>

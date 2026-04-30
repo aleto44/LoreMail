@@ -5,8 +5,6 @@ const PWA_URL = (import.meta.env.VITE_PWA_URL ?? 'https://loremail.app').replace
 const state = {
   step: 1,
   worldFlavour: '',
-  era: '',
-  tone: '',
   gmStyle: '',
   githubToken: '',    // repo token — shared with players, stored in KV
   modelToken: '',     // AI token — never leaves the server (stored as Actions secret only)
@@ -17,20 +15,22 @@ const state = {
   model: 'gpt-4o',
   availableModels: [],
   modelsVerified: false,
+  customGameId: '',
+  customPassphrase: '',
   gameId: null,
   passphrase: null,
   repoUrl: null,
   inviteLinks: [],
 };
 // Steps that allow going back
-const BACK_ALLOWED = [2, 3, 4];
+const BACK_ALLOWED = [2, 3, 4, 5];
 // Steps that allow going forward manually (have their own next btn logic elsewhere)
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 // ── Render ─────────────────────────────────────────────
 function render() {
   const app = document.getElementById('app');
   app.innerHTML = '';
-  const steps = [step1, step2, step3, step4, step5, step6, step7];
+  const steps = [step1, step2, step3, step4, step5, step6, step7, step8];
   const stepEl = steps[state.step - 1]?.();
   if (stepEl) app.appendChild(stepEl);
   const dots = document.createElement('div');
@@ -62,23 +62,18 @@ function step1() {
   const card = createCard('Describe your world', `
     <div class="field">
       <label>What is this world?</label>
-      <textarea id="flavour" placeholder="a crumbling empire where magic is contraband..." rows="3">${state.worldFlavour}</textarea>
-    </div>
-    <div class="field">
-      <label>Era</label>
-      <div class="chip-group" id="era-chips">
-        ${['Ancient', 'Medieval', 'Age of Sail', 'Industrial', 'Other'].map(e =>
-          `<div class="chip${state.era === e ? ' selected' : ''}" data-era="${e}">${e}</div>`
-        ).join('')}
-      </div>
-    </div>
-    <div class="field">
-      <label>Tone</label>
-      <div class="chip-group" id="tone-chips">
-        ${['Hopeful', 'Melancholic', 'Mysterious', 'Dangerous'].map(t =>
-          `<div class="chip${state.tone === t ? ' selected' : ''}" data-tone="${t}">${t}</div>`
-        ).join('')}
-      </div>
+      <textarea id="flavour" placeholder="a crumbling empire where magic is contraband..." rows="4">${state.worldFlavour}</textarea>
+      <details class="info-note hint-box" style="margin-top:8px;">
+        <summary style="cursor:pointer;font-weight:600;">Not sure what to write? Here are some things to consider ▾</summary>
+        <ul style="margin:8px 0 0 0;padding-left:18px;line-height:1.9;font-size:13px;">
+          <li><strong>Era or time period</strong> — ancient, medieval, age of sail, industrial, or something invented</li>
+          <li><strong>Tone or mood</strong> — hopeful, melancholic, mysterious, gritty, dangerous</li>
+          <li><strong>Political climate</strong> — empire in decline, occupied territory, city-state rivalry, a fragile peace</li>
+          <li><strong>Magic or technology</strong> — is magic common or forbidden? what technology exists?</li>
+          <li><strong>Geography or landmarks</strong> — major cities, roads, borders, or wildernesses</li>
+          <li><strong>Recent history</strong> — a war just ended, a plague swept through, a king died without an heir</li>
+        </ul>
+      </details>
     </div>
     <div class="field">
       <label>The GM</label>
@@ -91,12 +86,10 @@ function step1() {
     <button class="btn-primary" id="step1-next">Continue →</button>
   `);
   card.querySelector('#flavour').addEventListener('input', e => { state.worldFlavour = e.target.value; });
-  card.querySelectorAll('[data-era]').forEach(c => c.addEventListener('click', () => { state.era = c.dataset.era; render(); }));
-  card.querySelectorAll('[data-tone]').forEach(c => c.addEventListener('click', () => { state.tone = c.dataset.tone; render(); }));
   card.querySelectorAll('[data-gm]').forEach(c => c.addEventListener('click', () => { state.gmStyle = c.dataset.gm; render(); }));
   card.querySelector('#step1-next').addEventListener('click', () => {
-    if (!state.worldFlavour || !state.era || !state.tone || !state.gmStyle) {
-      showError(card, 'Please complete all fields.'); return;
+    if (!state.worldFlavour || !state.gmStyle) {
+      showError(card, 'Please describe your world and choose a GM style.'); return;
     }
     state.step = 2; render();
   });
@@ -257,40 +250,8 @@ function step2() {
   }
   return card;
 }
-// ── Step 3: Founder character ──────────────────────────
+// ── Step 3: AI model selection ─────────────────────────
 function step3() {
-  const card = createCard('Who are you in this world?', `
-    <p style="margin-bottom:16px;color:var(--faded);font-size:14px;">
-      Before you can write, we need to know who you are.
-    </p>
-    <div class="field">
-      <label>Your name in this world</label>
-      <input type="text" id="char-name" value="${state.founderCharacterName}" placeholder="Maren Voss" />
-    </div>
-    <div class="field">
-      <label>Who are you, in one sentence?</label>
-      <textarea id="char-bio" rows="2" placeholder="A disgraced cartographer mapping roads that no longer exist.">${state.founderCharacterBio}</textarea>
-    </div>
-    <div class="field">
-      <label>Where are you in the world right now?</label>
-      <textarea id="char-location" rows="2" placeholder="Somewhere on the road between two cities I'd rather not name.">${state.founderCharacterLocation}</textarea>
-    </div>
-    <button class="btn-primary" id="step3-next">Continue →</button>
-  `);
-  addNavRow(card, { backStep: 2 });
-  card.querySelector('#char-name').addEventListener('input', e => { state.founderCharacterName = e.target.value; });
-  card.querySelector('#char-bio').addEventListener('input', e => { state.founderCharacterBio = e.target.value; });
-  card.querySelector('#char-location').addEventListener('input', e => { state.founderCharacterLocation = e.target.value; });
-  card.querySelector('#step3-next').addEventListener('click', () => {
-    if (!state.founderCharacterName || !state.founderCharacterBio || !state.founderCharacterLocation) {
-      showError(card, 'Please fill in all three fields.'); return;
-    }
-    state.step = 4; render();
-  });
-  return card;
-}
-// ── Step 4: AI model selection ─────────────────────────
-function step4() {
   const verified = state.modelsVerified && state.availableModels.length > 0;
   const selectHtml = verified
     ? state.availableModels.map(m =>
@@ -333,9 +294,9 @@ function step4() {
         ${selectHtml}
       </select>
     </div>
-    <button class="btn-primary" id="step4-next" ${verified ? '' : 'disabled'} style="${verified ? '' : 'opacity:0.45;cursor:not-allowed;'}">Create World →</button>
+    <button class="btn-primary" id="step3-next" ${verified ? '' : 'disabled'} style="${verified ? '' : 'opacity:0.45;cursor:not-allowed;'}">Continue →</button>
   `);
-  addNavRow(card, { backStep: 3 });
+  addNavRow(card, { backStep: 2 });
 
   // Keep modelToken in sync as user types, and reset verification on change
   card.querySelector('#model-token-input').addEventListener('input', e => {
@@ -345,12 +306,12 @@ function step4() {
       state.modelsVerified = false;
       state.availableModels = [];
       const sel = card.querySelector('#model-select');
-      const createBtn = card.querySelector('#step4-next');
+      const nextBtn = card.querySelector('#step3-next');
       sel.disabled = true;
       sel.innerHTML = `<option value="" disabled selected>— verify your token first —</option>`;
-      createBtn.disabled = true;
-      createBtn.style.opacity = '0.45';
-      createBtn.style.cursor = 'not-allowed';
+      nextBtn.disabled = true;
+      nextBtn.style.opacity = '0.45';
+      nextBtn.style.cursor = 'not-allowed';
       card.querySelector('#models-status').textContent = 'Enter your model token above, then click to verify.';
       card.querySelector('#models-status').style.color = '';
       card.querySelector('#verify-models').textContent = '🔍 Verify & load available models';
@@ -367,7 +328,7 @@ function step4() {
     state.modelToken = token;
     const btn = card.querySelector('#verify-models');
     const statusEl = card.querySelector('#models-status');
-    const createBtn = card.querySelector('#step4-next');
+    const nextBtn = card.querySelector('#step3-next');
     const sel = card.querySelector('#model-select');
     btn.disabled = true;
     btn.textContent = '⏳ Checking…';
@@ -389,8 +350,6 @@ function step4() {
       statusEl.textContent = `Found ${ids.length} model${ids.length !== 1 ? 's' : ''}. Probing inference access…`;
 
       // Step 2: make a real inference call to confirm the token can actually prompt.
-      // Prefer a known-reliable model for the probe so that an unsupported first-
-      // alphabetical catalog entry (e.g. ai21-labs/...) doesn't block verification.
       const PREFERRED_PROBE = ['openai/gpt-4o', 'openai/gpt-4o-mini', 'meta/llama-3.3-70b-instruct'];
       const probeModel = PREFERRED_PROBE.find(m => ids.includes(m)) ?? ids[0];
       const probeRes = await fetch(`${WORKER_URL}/models/probe`, {
@@ -416,17 +375,17 @@ function step4() {
       statusEl.textContent = `✓ ${ids.length} model${ids.length !== 1 ? 's' : ''} available — inference confirmed`;
       statusEl.style.color = 'green';
       btn.textContent = '↻ Re-check available models';
-      createBtn.disabled = false;
-      createBtn.style.opacity = '';
-      createBtn.style.cursor = '';
+      nextBtn.disabled = false;
+      nextBtn.style.opacity = '';
+      nextBtn.style.cursor = '';
     } catch (e) {
       state.modelsVerified = false;
       state.availableModels = [];
       sel.disabled = true;
       sel.innerHTML = `<option value="" disabled selected>— verify your token first —</option>`;
-      createBtn.disabled = true;
-      createBtn.style.opacity = '0.45';
-      createBtn.style.cursor = 'not-allowed';
+      nextBtn.disabled = true;
+      nextBtn.style.opacity = '0.45';
+      nextBtn.style.cursor = 'not-allowed';
       statusEl.textContent = `⚠ Could not load models: ${e.message}`;
       statusEl.style.color = '#c0392b';
       btn.textContent = '🔍 Retry';
@@ -436,18 +395,90 @@ function step4() {
   }
 
   card.querySelector('#verify-models').addEventListener('click', runVerification);
-
   card.querySelector('#model-hint-btn').addEventListener('click', () => showModelGuide());
   card.querySelector('#model-select').addEventListener('change', e => { state.model = e.target.value; });
-  card.querySelector('#step4-next').addEventListener('click', async () => {
+  card.querySelector('#step3-next').addEventListener('click', () => {
     if (!state.modelsVerified) return;
+    state.step = 4; render();
+  });
+  return card;
+}
+// ── Step 4: Founder character ──────────────────────────
+function step4() {
+  const card = createCard('Who are you in this world?', `
+    <p style="margin-bottom:16px;color:var(--faded);font-size:14px;">
+      Before you can write, we need to know who you are.
+    </p>
+    <div class="field">
+      <label>Your name in this world</label>
+      <input type="text" id="char-name" value="${state.founderCharacterName}" placeholder="Maren Voss" />
+    </div>
+    <div class="field">
+      <label>Who are you, in one sentence?</label>
+      <textarea id="char-bio" rows="2" placeholder="A disgraced cartographer mapping roads that no longer exist.">${state.founderCharacterBio}</textarea>
+    </div>
+    <div class="field">
+      <label>Where are you in the world right now?</label>
+      <textarea id="char-location" rows="2" placeholder="Somewhere on the road between two cities I'd rather not name.">${state.founderCharacterLocation}</textarea>
+    </div>
+    <button class="btn-primary" id="step4-next">Continue →</button>
+  `);
+  addNavRow(card, { backStep: 3 });
+  card.querySelector('#char-name').addEventListener('input', e => { state.founderCharacterName = e.target.value; });
+  card.querySelector('#char-bio').addEventListener('input', e => { state.founderCharacterBio = e.target.value; });
+  card.querySelector('#char-location').addEventListener('input', e => { state.founderCharacterLocation = e.target.value; });
+  card.querySelector('#step4-next').addEventListener('click', () => {
+    if (!state.founderCharacterName || !state.founderCharacterBio || !state.founderCharacterLocation) {
+      showError(card, 'Please fill in all three fields.'); return;
+    }
     state.step = 5; render();
+  });
+  return card;
+}
+// ── Step 5: Game ID & Passphrase ───────────────────────
+function step5() {
+  const card = createCard('Name your game', `
+    <p style="margin-bottom:16px;color:var(--faded);font-size:14px;">
+      Choose a Game ID and passphrase. Share the passphrase with your players — they will need it to restore their session on new devices.
+    </p>
+    <div class="field">
+      <label>Game ID</label>
+      <input type="text" id="game-id-input" value="${state.customGameId}"
+        placeholder="iron-vale" maxlength="40" />
+      <p class="info-note" style="margin-top:4px;">
+        Lowercase letters, numbers, and hyphens only. Players will see this ID.
+      </p>
+    </div>
+    <div class="field">
+      <label>Passphrase</label>
+      <input type="text" id="passphrase-input" value="${state.customPassphrase}"
+        placeholder="wolf · runs · midnight" />
+      <p class="info-note" style="margin-top:4px;">
+        Write it down — it cannot be recovered once the game is created.
+      </p>
+    </div>
+    <button class="btn-primary" id="step5-next">Create World →</button>
+  `);
+  addNavRow(card, { backStep: 4 });
+  card.querySelector('#game-id-input').addEventListener('input', e => {
+    // Sanitise on the fly: lowercase, strip invalid chars
+    const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (cleaned !== e.target.value) e.target.value = cleaned;
+    state.customGameId = cleaned;
+  });
+  card.querySelector('#passphrase-input').addEventListener('input', e => {
+    state.customPassphrase = e.target.value;
+  });
+  card.querySelector('#step5-next').addEventListener('click', async () => {
+    if (!state.customGameId) { showError(card, 'Please enter a Game ID.'); return; }
+    if (!state.customPassphrase) { showError(card, 'Please enter a passphrase.'); return; }
+    state.step = 6; render();
     await createGame();
   });
   return card;
 }
-// ── Step 5: Creating… ──────────────────────────────────
-function step5() {
+// ── Step 6: Creating… ──────────────────────────────────
+function step6() {
   const card = createCard('Creating your world…', `
     <div class="loading">
       <div style="font-size:28px;margin-bottom:12px;">〄</div>
@@ -457,23 +488,25 @@ function step5() {
   `);
   return card;
 }
-// ── Step 6: Passphrase ─────────────────────────────────
-function step6() {
+// ── Step 7: World ready ────────────────────────────────
+function step7() {
   const card = createCard('Your world is ready', `
     <p style="color:var(--faded);font-size:14px;margin-bottom:16px;">
-      Share this passphrase with your players so they can restore their session on new devices.
+      Your game has been created. Share the passphrase with your players so they can restore their session on new devices.
     </p>
-    <label>Game passphrase</label>
+    <label>Game ID</label>
+    <div class="passphrase-display" style="font-size:14px;">${state.gameId}</div>
+    <label style="margin-top:12px;display:block;">Passphrase</label>
     <div class="passphrase-display">${state.passphrase}</div>
     <p class="info-note">Write it down. It cannot be recovered.</p>
-    <p style="margin-top:16px;font-size:13px;color:var(--faded);">Game: <code>${state.gameId}</code></p>
-    <button class="btn-primary" id="step6-next" style="margin-top:20px;">Write your first letter →</button>
+    ${state.repoUrl ? `<p style="margin-top:8px;font-size:13px;color:var(--faded);">Repo: <a href="${state.repoUrl}" target="_blank" style="color:var(--accent);">${state.repoUrl}</a></p>` : ''}
+    <button class="btn-primary" id="step7-next" style="margin-top:20px;">Write your first letter →</button>
   `);
-  card.querySelector('#step6-next').addEventListener('click', () => { state.step = 7; render(); });
+  card.querySelector('#step7-next').addEventListener('click', () => { state.step = 8; render(); });
   return card;
 }
-// ── Step 7: First letter + invite links ───────────────
-function step7() {
+// ── Step 8: First letter + invite links ───────────────
+function step8() {
   const card = createCard('Invite players', `
     <div class="field">
       <label>Write your first letter to a player</label>
@@ -535,24 +568,24 @@ async function createGame() {
         founderGithubToken: state.githubToken,  // repo token — shared with players
         copilotToken: state.modelToken,          // AI token — stored only as Actions secret
         worldFlavour: state.worldFlavour,
-        era: state.era,
-        tone: state.tone,
         gmStyle: state.gmStyle,
         model: state.model,
         founderCharacterName: state.founderCharacterName,
         founderCharacterBio: state.founderCharacterBio,
         founderCharacterLocation: state.founderCharacterLocation,
+        gameId: state.customGameId,
+        passphrase: state.customPassphrase,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Creation failed');
     state.gameId = data.gameId;
-    state.passphrase = data.passphrase;
+    state.passphrase = data.passphrase ?? state.customPassphrase;
     state.repoUrl = data.repoUrl;
-    state.step = 6;
+    state.step = 7;
     render();
   } catch (e) {
-    state.step = 4;
+    state.step = 5;
     render();
     const card = document.querySelector('.step-card');
     if (card) showError(card, `Error: ${e.message}`);

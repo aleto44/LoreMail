@@ -20,12 +20,12 @@ export async function handleCreateGame(request, env) {
     'founderGithubToken',
     'copilotToken',
     'worldFlavour',
-    'era',
-    'tone',
     'gmStyle',
     'model',
     'founderCharacterName',
     'founderCharacterBio',
+    'gameId',
+    'passphrase',
   ]);
   if (error) return error;
 
@@ -40,6 +40,8 @@ export async function handleCreateGame(request, env) {
     founderCharacterName,
     founderCharacterBio,
     founderCharacterLocation,
+    gameId: requestedGameId,
+    passphrase: requestedPassphrase,
   } = data;
 
   // Get founder's GitHub identity
@@ -47,12 +49,16 @@ export async function handleCreateGame(request, env) {
   const founderId = ghUser.login;
   const owner = ghUser.login;
 
-  // Generate game ID + passphrase
-  const gameSlug = slugify(worldFlavour.split(' ').slice(0, 3).join('-') || 'world');
-  const suffix = Math.random().toString(36).slice(2, 7);
-  const gameId = `${gameSlug}-${suffix}`;
+  // Use provided game ID + passphrase (or fall back to auto-generated)
+  const gameId = requestedGameId
+    ? slugify(requestedGameId)
+    : (() => {
+        const gameSlug = slugify(worldFlavour.split(' ').slice(0, 3).join('-') || 'world');
+        const suffix = Math.random().toString(36).slice(2, 7);
+        return `${gameSlug}-${suffix}`;
+      })();
   const repoName = `${gameId}-loremail`;
-  const passphrase = generatePassphrase();
+  const passphrase = requestedPassphrase || generatePassphrase();
   const hashedPassphrase = await hashPassphrase(passphrase);
 
   // Create private GitHub repo
@@ -125,26 +131,17 @@ export async function handleCreateGame(request, env) {
   );
 
   // Trigger world seed generation.
-  // GitHub Actions workflows on freshly-created repos are not immediately dispatchable —
-  // they need a few seconds to be registered after the first push.
-  // Retry up to 5 times with 4-second gaps (max ~20 s extra wait).
+  // The workflow may not be immediately dispatchable on a brand-new repo — if this
+  // single attempt fails the founder can use the "Re-trigger seed generation" button
+  // in the PWA, or POST /game/trigger-seed directly.
   let seedTriggered = false;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await dispatchWorkflow(founderGithubToken, owner, repoName, 'gm-loop.yml', {
-        trigger: 'seed_generation',
-      });
-      seedTriggered = true;
-      break;
-    } catch (e) {
-      console.warn(`Seed dispatch attempt ${attempt + 1} failed: ${e.message}`);
-      if (attempt < 1) {
-        await new Promise(r => setTimeout(r, 60000));
-      }
-    }
-  }
-  if (!seedTriggered) {
-    console.warn('Seed trigger failed after all retries. Founder can re-trigger via /game/trigger-seed.');
+  try {
+    await dispatchWorkflow(founderGithubToken, owner, repoName, 'gm-loop.yml', {
+      trigger: 'seed_generation',
+    });
+    seedTriggered = true;
+  } catch (e) {
+    console.warn(`Seed dispatch failed: ${e.message}. Founder can re-trigger via /game/trigger-seed.`);
   }
 
   return json({ gameId, passphrase, repoUrl: repo.html_url, seedTriggered });

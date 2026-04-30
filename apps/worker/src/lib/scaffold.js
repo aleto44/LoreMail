@@ -24,8 +24,10 @@ export function buildGameScaffold({ gameJson, engineJson, founderId, founderChar
   files['letters/pending/.gitkeep'] = '';
   files['letters/delivered/.gitkeep'] = '';
 
+  files['.gitignore'] = `node_modules/\n.env\n`;
+
   files['scripts/gm.js'] = buildGmScript();
-  files['scripts/package.json'] = JSON.stringify(
+  files['package.json'] = JSON.stringify(
     {
       name: 'game-scripts',
       version: '1.0.0',
@@ -54,7 +56,7 @@ export function buildGameScaffold({ gameJson, engineJson, founderId, founderChar
 
 function buildGmScript() {
   return `#!/usr/bin/env node
-import { GMEngine } from './engine/index.js';
+import { GMEngine } from '../engine/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFile } from 'fs/promises';
@@ -198,16 +200,15 @@ jobs:
         if: \${{ env.SKIP_GM != 'true' }}
         with:
           node-version: '20'
-      - name: Cache scripts/node_modules
+      - name: Cache node_modules
         if: \${{ env.SKIP_GM != 'true' }}
         uses: actions/cache@v4
         with:
-          path: scripts/node_modules
-          key: \${{ runner.os }}-npm-\${{ hashFiles('scripts/package.json') }}
+          path: node_modules
+          key: \${{ runner.os }}-npm-\${{ hashFiles('package.json') }}
           restore-keys: \${{ runner.os }}-npm-
       - run: npm install
         if: \${{ env.SKIP_GM != 'true' }}
-        working-directory: scripts
       - run: node scripts/gm.js
         if: \${{ env.SKIP_GM != 'true' }}
         env:
@@ -221,6 +222,7 @@ jobs:
           git config user.email "gm@loremail.app"
           git add -A
           git diff --staged --quiet || git commit -m "GM: \${{ inputs.trigger || 'letter_delivery' }} \$(date -u +%s)"
+          git pull --rebase origin main
           git push
 `;
 }
