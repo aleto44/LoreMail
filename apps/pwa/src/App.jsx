@@ -39,17 +39,26 @@ export default function App() {
   }, [refresh]);
 
   // ── Auth states ──────────────────────────────────────────
+  // Always show JoinFlow for invite links — even if the user has an existing
+  // session from a different game, the invite link must take priority.
+  if (joinGameId && inviteToken) {
+    return (
+      <JoinFlow
+        gameId={joinGameId}
+        inviteToken={inviteToken}
+        workerUrl={WORKER_URL}
+        onJoined={saveSession}
+      />
+    );
+  }
+
+  // If the URL specifies a game ID that doesn't match the stored session, force
+  // re-authentication so the founder can log into the newly created game.
+  if (joinGameId && session?.gameId && session.gameId !== joinGameId) {
+    return <RestoreFlow workerUrl={WORKER_URL} onRestored={saveSession} />;
+  }
+
   if (!session) {
-    if (joinGameId && inviteToken) {
-      return (
-        <JoinFlow
-          gameId={joinGameId}
-          inviteToken={inviteToken}
-          workerUrl={WORKER_URL}
-          onJoined={saveSession}
-        />
-      );
-    }
     return <RestoreFlow workerUrl={WORKER_URL} onRestored={saveSession} />;
   }
 
@@ -59,7 +68,6 @@ export default function App() {
       <ComposeScreen
         session={session}
         data={data}
-        workerUrl={WORKER_URL}
         onSent={() => { setComposing(false); refresh(); }}
         onCancel={() => setComposing(false)}
       />
@@ -132,6 +140,7 @@ export default function App() {
             worldTab={worldTab}
             setWorldTab={setWorldTab}
             session={session}
+            onRefresh={refresh}
           />
         )}
         {tab === 'control' && session.isFounder && (

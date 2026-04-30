@@ -16,12 +16,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check for due letters (skip if none)
+        if: ${{ (inputs.trigger || 'letter_delivery') == 'letter_delivery' }}
+        run: |
+          NOW=$(date +%s)
+          SKIP=true
+          shopt -s nullglob
+          for f in letters/pending/*.md; do
+            FNAME=$(basename "$f")
+            DELIVER_AT="${FNAME%%_*}"
+            if [[ "$DELIVER_AT" =~ ^[0-9]+$ ]] && (( DELIVER_AT <= NOW )); then
+              SKIP=false
+              break
+            fi
+          done
+          if [ "$SKIP" = "true" ]; then
+            echo "No letters due for delivery. Exiting early."
+            echo "SKIP_GM=true" >> "$GITHUB_ENV"
+          fi
+
       - uses: actions/setup-node@v4
+        if: ${{ env.SKIP_GM != 'true' }}
         with:
           node-version: '20'
-      - run: npm ci
+      - name: Cache scripts/node_modules
+        if: ${{ env.SKIP_GM != 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: scripts/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('scripts/package.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+      - run: npm install
+        if: ${{ env.SKIP_GM != 'true' }}
+        working-directory: scripts
       - run: node scripts/gm.js
+        if: ${{ env.SKIP_GM != 'true' }}
         env:
           COPILOT_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRIGGER: ${{ inputs.trigger || 'letter_delivery' }}
+      - name: Commit GM changes
+        if: ${{ env.SKIP_GM != 'true' }}
+        run: |
+          git config user.name "GM Engine"
+          git config user.email "gm@loremail.app"
+          git add -A
+          git diff --staged --quiet || git commit -m "GM: ${{ inputs.trigger || 'letter_delivery' }} $(date -u +%s)"
+          git push

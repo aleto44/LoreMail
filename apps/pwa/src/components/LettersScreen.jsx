@@ -12,9 +12,11 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
   const sent = delivered.filter(l => l.from === session.playerId);
   const inTransit = pending.filter(l => l.from === session.playerId);
 
+  const isEmpty = inbox.length === 0 && inTransit.length === 0 && sent.length === 0;
+
   return (
     <div>
-      {inbox.length === 0 && inTransit.length === 0 && (
+      {isEmpty && (
         <div className="empty-state">
           <div style={{ fontSize: 28, marginBottom: 12 }}>〄</div>
           No letters yet.<br />
@@ -54,6 +56,25 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
           ))}
         </>
       )}
+
+      {sent.length > 0 && (
+        <>
+          <div className="section-title">Sent</div>
+          {sent.map(letter => (
+            <div
+              key={letter.id}
+              className="letter-row letter-row--sent"
+              onClick={() => onReadLetter(letter)}
+            >
+              <div className="letter-row-meta">
+                <div className="letter-row-from">→ {formatRecipientName(letter.to, data)}</div>
+                <div className="letter-row-preview">{letter.body.split('\n')[0]?.slice(0, 60)}…</div>
+                <div className="letter-row-time">{letter.arrivedLabel}</div>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -63,5 +84,5 @@ function formatSenderName(id, data) {
 }
 
 function formatRecipientName(id, data) {
-  return data?.characters?.[id]?.name ?? id;
+  return data?.characters?.[id]?.name ?? '-unknown-';
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Octokit } from '@octokit/rest';
 
-export function ComposeScreen({ session, data, workerUrl, onSent, onCancel }) {
+export function ComposeScreen({ session, data, onSent, onCancel }) {
   const [to, setTo] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -39,9 +39,20 @@ export function ComposeScreen({ session, data, workerUrl, onSent, onCancel }) {
         content: btoa(unescape(encodeURIComponent(content))),
       });
 
-      // Trigger GM (fire and forget, don't block on passphrase requirement)
-      // Note: trigger endpoint requires passphrase — user may not have it stored
-      // We trigger via the worker if passphrase is available in session
+      // Trigger GM — call GitHub Actions dispatch directly, no worker hop needed
+      fetch(
+        `https://api.github.com/repos/${session.repoOwner}/${session.repoName}/actions/workflows/gm-loop.yml/dispatches`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.githubToken}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ref: 'main', inputs: { trigger: 'letter_delivery' } }),
+        }
+      ).catch(e => console.warn('GM trigger failed:', e.message));
 
       onSent();
     } catch (e) {

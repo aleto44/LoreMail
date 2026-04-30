@@ -8,9 +8,10 @@
  *   seed_generation  — generates world seed on game creation
  *   finalization     — generates chronicle.md
  */
-import { GMEngine } from 'loremail-gm-engine';
+import { GMEngine } from './engine/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFile } from 'fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_PATH = path.resolve(__dirname, '..');
@@ -20,15 +21,8 @@ async function main() {
   const apiToken = process.env.COPILOT_TOKEN;
   if (!apiToken) throw new Error('COPILOT_TOKEN environment variable is required');
 
-  // Load config
-  let gameJson, engineJson;
-  try {
-    const { readFile } = await import('fs/promises');
-    gameJson = JSON.parse(await readFile(path.join(REPO_PATH, 'config/game.json'), 'utf8'));
-    engineJson = JSON.parse(await readFile(path.join(REPO_PATH, 'config/engine.json'), 'utf8'));
-  } catch (e) {
-    throw new Error(`Failed to load config: ${e.message}`);
-  }
+  const gameJson = JSON.parse(await readFile(path.join(REPO_PATH, 'config/game.json'), 'utf8'));
+  const engineJson = JSON.parse(await readFile(path.join(REPO_PATH, 'config/engine.json'), 'utf8'));
 
   if (gameJson.gm_paused && TRIGGER === 'letter_delivery') {
     console.log('GM is paused. Exiting.');
@@ -37,7 +31,7 @@ async function main() {
 
   const engine = new GMEngine({
     repoPath: REPO_PATH,
-    model: gameJson.model ?? 'gpt-4o',
+    model: gameJson.model ?? 'openai/gpt-4.1',
     apiToken,
     engineConfig: engineJson,
   });
@@ -46,18 +40,18 @@ async function main() {
 
   if (TRIGGER === 'seed_generation') {
     console.log('Generating world seed...');
+    const founderPlayer = gameJson.players?.find(p => p.is_founder);
     await engine.generateWorldSeed({
       flavour: gameJson.flavour,
       era: gameJson.era,
       tone: gameJson.tone,
       gmStyle: gameJson.gm_style,
       game: gameJson,
+      founderCharacter: founderPlayer
+        ? { name: founderPlayer.character, bio: founderPlayer.bio, location: founderPlayer.location }
+        : null,
     });
-    await engine.statusWriter.write({
-      trigger: 'seed_generation',
-      lettersProcessed: 0,
-      success: true,
-    });
+    await engine.writeStatus({ trigger: 'seed_generation', lettersProcessed: 0, success: true });
     console.log('World seed generated.');
     return;
   }
@@ -65,11 +59,7 @@ async function main() {
   if (TRIGGER === 'finalization') {
     console.log('Generating chronicle...');
     await engine.generateChronicle({ game: gameJson });
-    await engine.statusWriter.write({
-      trigger: 'finalization',
-      lettersProcessed: 0,
-      success: true,
-    });
+    await engine.writeStatus({ trigger: 'finalization', lettersProcessed: 0, success: true });
     console.log('Chronicle generated.');
     return;
   }
@@ -92,56 +82,63 @@ async function main() {
 
   let processed = 0;
   let lastError = null;
+  const deliveries = [];
 
   for (const letter of dueLetters) {
+    const { frontmatter, body } = letter;
+    const letterId = path.basename(letter.path);
     try {
-      console.log(`Processing letter: ${letter.path}`);
-      const { frontmatter, body } = letter;
-
-      const gmResponse = await engine.processDelivery({
+      console.log(`Processing: ${letterId}`);
+      const result = await engine.processDelivery({
         letter: body,
         from: frontmatter.from,
         to: frontmatter.to,
         game: gameJson,
+        sentAt: frontmatter.sent_at,
       });
 
-      // Update sender location
-      if (gmResponse.sender_location_update) {
-        await ws.writeLocation(frontmatter.from, gmResponse.sender_location_update);
+      if (result.senderLocationUpdate) {
+        await ws.writeLocation(frontmatter.from, result.senderLocationUpdate);
       }
-
-      // Update recipient location
-      if (gmResponse.recipient_location_update) {
-        await ws.writeLocation(frontmatter.to, gmResponse.recipient_location_update);
+      if (result.recipientLocationUpdate) {
+        await ws.writeLocation(frontmatter.to, result.recipientLocationUpdate);
       }
-
-      // Update travel time in game.json
-      if (gmResponse.next_letter_travel_hours && gmResponse.next_letter_travel_hours > 0) {
-        gameJson.default_travel_hours = gmResponse.next_letter_travel_hours;
+      if (result.nextLetterTravelHours > 0) {
+        gameJson.default_travel_hours = result.nextLetterTravelHours;
         await ws.writeGameJson(gameJson);
       }
 
-      // Deliver the letter (move to /delivered/, mark delivered: true)
       await ws.deliverLetter(letter.path);
-
       processed++;
+
+      deliveries.push({
+        letterId, success: true,
+        canonAddition: !!result.canonAddition,
+        worldEvent: !!result.worldEvent,
+        consistencyConflict: result.consistencyConflict,
+        error: null,
+      });
     } catch (err) {
-      console.error(`Error processing ${letter.path}:`, err);
+      console.error(`Error processing ${letterId}:`, err.message);
       lastError = err;
+      deliveries.push({
+        letterId, success: false,
+        canonAddition: false, worldEvent: false,
+        consistencyConflict: false, error: err.message,
+      });
     }
   }
 
-  // Check if canon needs compression
-  const compressed = await engine.summarizeIfNeeded();
-  if (compressed) {
-    console.log('Canon compression ran.');
-  }
+  const compressionRan = await engine.summarizeIfNeeded();
+  if (compressionRan) console.log('Canon compression ran.');
 
-  await engine.statusWriter.write({
+  await engine.writeStatus({
     trigger: 'letter_delivery',
     lettersProcessed: processed,
     success: lastError === null,
     error: lastError,
+    compressionRan,
+    deliveries,
   });
 
   console.log(`GM run complete. Processed: ${processed}. Success: ${lastError === null}.`);

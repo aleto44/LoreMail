@@ -1,12 +1,12 @@
 import { json } from '../index.js';
 import { requireBody, getGame, putGame } from '../lib/auth.js';
-import { createFile } from '../lib/github.js';
+import { createFile, updateFile } from '../lib/github.js';
 
 export async function handleJoin(request, env) {
-  const { error, data } = await requireBody(request, ['gameId', 'inviteToken', 'characterName', 'characterBio']);
+  const { error, data } = await requireBody(request, ['gameId', 'inviteToken', 'characterName', 'characterBio', 'characterLocation']);
   if (error) return error;
 
-  const { gameId, inviteToken, characterName, characterBio } = data;
+  const { gameId, inviteToken, characterName, characterBio, characterLocation } = data;
 
   // Validate invite token
   const inviteRaw = await env.KV.get(`invite:${inviteToken}`);
@@ -36,7 +36,7 @@ export async function handleJoin(request, env) {
     game.repoOwner,
     game.repoName,
     `players/${playerId}/location.md`,
-    `Unknown`,
+    characterLocation || 'Unknown',
     `join: ${playerId} location`,
   );
 
@@ -49,14 +49,62 @@ export async function handleJoin(request, env) {
   );
   await putGame(env, gameId, { ...game, players });
 
+  // Update config/game.json in the repo so the GM sees the new player
+  try {
+    const ghBase = `https://api.github.com/repos/${game.repoOwner}/${game.repoName}/contents`;
+    const headers = {
+      Authorization: `Bearer ${game.githubToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'loremail-worker/1.0',
+    };
+    const fileRes = await fetch(`${ghBase}/config/game.json`, { headers });
+    if (fileRes.ok) {
+      const fileData = await fileRes.json();
+      const currentGame = JSON.parse(atob(fileData.content.replace(/\n/g, '')));
+      // Add or update the player in the roster
+      const existing = currentGame.players ?? [];
+      const idx = existing.findIndex(p => p.id === playerId);
+      const playerEntry = { id: playerId, character: characterName, bio: characterBio, joined: true, is_founder: false };
+      if (idx >= 0) existing[idx] = playerEntry;
+      else existing.push(playerEntry);
+      currentGame.players = existing;
+      await fetch(`${ghBase}/config/game.json`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `join: ${playerId} added to roster`,
+          content: btoa(JSON.stringify(currentGame, null, 2)),
+          sha: fileData.sha,
+        }),
+      });
+    }
+  } catch (e) {
+    console.warn('Failed to update game.json in repo:', e.message);
+  }
+
   // Store session
   await env.KV.put(
     `session:${gameId}:${playerId}`,
     JSON.stringify({ characterName, isFounder: false }),
   );
 
-  // We generate a scoped token for this player via game's github token
-  // For simplicity players share read access via the same token (game is private)
+  // Trigger the GM to process the invite letter immediately (fire-and-forget)
+  fetch(
+    `https://api.github.com/repos/${game.repoOwner}/${game.repoName}/actions/workflows/gm-loop.yml/dispatches`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${game.githubToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+        'User-Agent': 'loremail-worker/1.0',
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { trigger: 'letter_delivery' } }),
+    }
+  ).catch(e => console.warn('GM trigger on join failed:', e.message));
+
   return json({
     githubToken: game.githubToken,
     playerId,
@@ -64,5 +112,6 @@ export async function handleJoin(request, env) {
     isFounder: false,
     repoOwner: game.repoOwner,
     repoName: game.repoName,
+    gameId,
   });
 }

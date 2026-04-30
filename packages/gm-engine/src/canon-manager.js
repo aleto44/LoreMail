@@ -1,6 +1,8 @@
+import { CompressionPromptBuilder } from './compression-prompt.js';
+
 /**
  * CanonManager — two-layer canon structure (DEEP HISTORY / RECENT HISTORY).
- * Handles compression, tag management, and append logic.
+ * Tracks word count, triggers compression, manages tags.
  */
 export class CanonManager {
   constructor(worldState, engineConfig) {
@@ -10,106 +12,104 @@ export class CanonManager {
     this.deepSummaryTarget = engineConfig.canon_deep_summary_target ?? 800;
     this.lockedTag = engineConfig.locked_tag ?? '[LOCKED]';
     this.developingTag = engineConfig.developing_tag ?? '[DEVELOPING]';
+    this.compressionPromptBuilder = new CompressionPromptBuilder();
   }
 
-  /** Count words in a string */
   _wordCount(text) {
     return text.trim().split(/\s+/).filter(Boolean).length;
   }
 
-  /** Parse canon into { deep, recent } sections */
-  _parseSections(canonText) {
-    const deepMatch = canonText.match(/## DEEP HISTORY\n([\s\S]*?)(?=---\n## RECENT HISTORY|$)/);
-    const recentMatch = canonText.match(/## RECENT HISTORY\n([\s\S]*?)$/);
-    return {
-      deep: deepMatch ? deepMatch[1].trim() : '',
-      recent: recentMatch ? recentMatch[1].trim() : '',
-    };
-  }
-
-  /** Rebuild canon.md from sections */
-  _buildCanon(deep, recent) {
-    return `## DEEP HISTORY\n*[summarized — compressed from earlier records]*\n\n${deep}\n\n---\n\n## RECENT HISTORY\n*[verbatim — last recorded entries]*\n\n${recent}\n`;
-  }
-
-  /** Check if RECENT HISTORY exceeds word limit */
   async isCompressionNeeded() {
     const canon = await this.ws.readCanon();
-    const { recent } = this._parseSections(canon);
+    const { recent } = this.ws.parseSections(canon);
     return this._wordCount(recent) >= this.recentWordLimit;
   }
 
-  /** Get word count of RECENT HISTORY */
   async recentWordCount() {
     const canon = await this.ws.readCanon();
-    const { recent } = this._parseSections(canon);
+    const { recent } = this.ws.parseSections(canon);
     return this._wordCount(recent);
   }
 
   /**
-   * Compress the oldest 50% of RECENT HISTORY entries into DEEP HISTORY.
-   * modelClient is used for the summary call.
+   * Append a new entry to RECENT HISTORY.
+   * The entry text should already include the ### [DEVELOPING] heading
+   * as produced by the model. We just append it directly.
    */
-  async runCompression(modelClient) {
-    const canon = await this.ws.readCanon();
-    const { deep, recent } = this._parseSections(canon);
-
-    // Split recent into entries by ### headers
-    const entries = recent.split(/(?=### )/).filter(Boolean);
-    if (entries.length < 2) return; // nothing to compress
-
-    const splitIdx = Math.ceil(entries.length / 2);
-    const toCompress = entries.slice(0, splitIdx).join('\n\n');
-    const toKeep = entries.slice(splitIdx).join('\n\n');
-
-    const compressionPrompt = [
-      {
-        role: 'system',
-        content:
-          'You are a historian compressing detailed records into a concise summary. ' +
-          `Target approximately ${this.deepSummaryTarget} words. ` +
-          'Preserve proper nouns, named locations, key events, and established facts. ' +
-          'Write in third person, past tense, measured and authoritative. ' +
-          'Do not invent new information.',
-      },
-      {
-        role: 'user',
-        content: `Compress the following canon entries into a single cohesive historical summary:\n\n${toCompress}`,
-      },
-    ];
-
-    const compressed = await modelClient.chat(compressionPrompt, { temperature: 0.2 });
-    const newDeep = deep ? `${deep}\n\n${compressed}` : compressed;
-    const newCanon = this._buildCanon(newDeep, toKeep);
-
-    // Overwrite canon — compression is the only allowed full rewrite
-    await this.ws.writeFile('world/canon.md', newCanon);
+  async appendEntry(entryText) {
+    await this.ws.appendToCanon('\n' + entryText.trim());
   }
 
   /**
-   * Append a new entry to RECENT HISTORY.
-   * Entry always starts as [DEVELOPING].
+   * Run compression: oldest 50% of RECENT HISTORY entries → DEEP HISTORY.
+   * Uses anchor-list strategy from the engine plan.
    */
-  async appendEntry(entryText) {
-    const timestamp = new Date().toISOString().split('T')[0];
-    const tagged = `### ${this.developingTag} ${entryText.trimStart().replace(/^###\s*/, '')}\n*established: ${timestamp} · source: gm-inference*`;
-    await this.ws.appendToCanon('\n' + tagged);
+  async runCompression(modelClient) {
+    const canon = await this.ws.readCanon();
+    const { recent } = this.ws.parseSections(canon);
+
+    // Split recent entries on ### headings
+    const entries = recent.split(/(?=### )/).filter(s => s.trim());
+    if (entries.length < 2) return;
+
+    const splitIdx = Math.ceil(entries.length / 2);
+    const toCompress = entries.slice(0, splitIdx);
+    const toKeep = entries.slice(splitIdx);
+
+    // Build anchor list from proper nouns and canon-facts terms
+    const facts = await this.ws.readFacts();
+    const anchorList = this._buildAnchorList(toCompress.join('\n'), facts);
+
+    // Compress in chunks of ≤5
+    const CHUNK_SIZE = 5;
+    const compressedBlocks = [];
+
+    for (let i = 0; i < toCompress.length; i += CHUNK_SIZE) {
+      const chunk = toCompress.slice(i, i + CHUNK_SIZE);
+      const messages = this.compressionPromptBuilder.buildCompressionChunkPrompt(chunk, anchorList);
+      try {
+        const compressed = await modelClient.chat(messages, { temperature: 0.2, maxTokens: 600 });
+        compressedBlocks.push(compressed.trim());
+      } catch (err) {
+        console.error('Compression chunk failed, skipping:', err.message);
+      }
+    }
+
+    if (compressedBlocks.length === 0) return;
+
+    // Write: append compressed blocks to DEEP HISTORY, replace RECENT HISTORY
+    await this.ws.appendToDeepHistory(compressedBlocks.join('\n\n'));
+    await this.ws.replaceRecentHistory(toKeep.join('\n\n'));
   }
 
-  /** Promote an entry's tag from DEVELOPING → LOCKED in canon.md */
-  async promoteToLocked(entryHeader) {
+  /** Promote a [DEVELOPING] entry to [LOCKED] by its short title */
+  async promoteToLocked(entryTitle) {
     const canon = await this.ws.readCanon();
-    const updated = canon.replace(
-      new RegExp(`### \\[DEVELOPING\\] ${escapeRegex(entryHeader)}`, 'g'),
-      `### ${this.lockedTag} ${entryHeader}`,
-    );
+    const pattern = new RegExp(`### \\[DEVELOPING\\] ${escapeRegex(entryTitle)}`, 'g');
+    const updated = canon.replace(pattern, `### ${this.lockedTag} ${entryTitle}`);
     await this.ws.writeFile('world/canon.md', updated);
   }
 
-  /** Initialize blank canon structure */
+  /** Initialize blank canon structure for a new game */
   async initBlank() {
-    const canon = this._buildCanon('', '');
-    await this.ws.writeFile('world/canon.md', canon);
+    await this.ws.writeFile('world/canon.md', this.ws.rebuildCanon('', ''));
+  }
+
+  /** Build anchor list: proper nouns + fact-list terms from text */
+  _buildAnchorList(text, facts) {
+    const anchors = new Set();
+    // Extract capitalised multi-word phrases (rough heuristic)
+    const capPhrases = text.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/g) ?? [];
+    capPhrases.forEach(p => anchors.add(p));
+    // Extract single capitalised words that aren't sentence-starters (rough)
+    const capWords = text.match(/(?<=[.!?]\s+|^)(?![A-Z][a-z]+[.,])([A-Z][a-z]{3,})/gm) ?? [];
+    capWords.forEach(w => anchors.add(w));
+    // From facts, grab the proper nouns too
+    if (facts) {
+      const factProper = facts.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) ?? [];
+      factProper.forEach(p => anchors.add(p));
+    }
+    return [...anchors].slice(0, 30); // cap at 30 to avoid bloat
   }
 }
 

@@ -39,6 +39,7 @@ export async function handleCreateGame(request, env) {
     model,
     founderCharacterName,
     founderCharacterBio,
+    founderCharacterLocation,
   } = data;
 
   // Get founder's GitHub identity
@@ -72,6 +73,7 @@ export async function handleCreateGame(request, env) {
         id: founderId,
         character: founderCharacterName,
         bio: founderCharacterBio,
+        location: founderCharacterLocation || 'Unknown',
         joined: true,
         is_founder: true,
       },
@@ -85,6 +87,7 @@ export async function handleCreateGame(request, env) {
     temperature: 0.4,
     consistency_check: true,
     fact_extraction: true,
+    events_window: 20,
     locked_tag: '[LOCKED]',
     developing_tag: '[DEVELOPING]',
   };
@@ -95,6 +98,7 @@ export async function handleCreateGame(request, env) {
     founderId,
     founderCharacterName,
     founderCharacterBio,
+    founderCharacterLocation: founderCharacterLocation || 'Unknown',
   });
 
   for (const [filePath, content] of Object.entries(files)) {
@@ -120,14 +124,28 @@ export async function handleCreateGame(request, env) {
     JSON.stringify({ characterName: founderCharacterName, isFounder: true }),
   );
 
-  // Trigger world seed generation
-  try {
-    await dispatchWorkflow(founderGithubToken, owner, repoName, 'gm-loop.yml', {
-      trigger: 'seed_generation',
-    });
-  } catch (e) {
-    console.warn('Seed trigger failed (may need to wait for Actions to initialize):', e.message);
+  // Trigger world seed generation.
+  // GitHub Actions workflows on freshly-created repos are not immediately dispatchable —
+  // they need a few seconds to be registered after the first push.
+  // Retry up to 5 times with 4-second gaps (max ~20 s extra wait).
+  let seedTriggered = false;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await dispatchWorkflow(founderGithubToken, owner, repoName, 'gm-loop.yml', {
+        trigger: 'seed_generation',
+      });
+      seedTriggered = true;
+      break;
+    } catch (e) {
+      console.warn(`Seed dispatch attempt ${attempt + 1} failed: ${e.message}`);
+      if (attempt < 1) {
+        await new Promise(r => setTimeout(r, 60000));
+      }
+    }
+  }
+  if (!seedTriggered) {
+    console.warn('Seed trigger failed after all retries. Founder can re-trigger via /game/trigger-seed.');
   }
 
-  return json({ gameId, passphrase, repoUrl: repo.html_url });
+  return json({ gameId, passphrase, repoUrl: repo.html_url, seedTriggered });
 }

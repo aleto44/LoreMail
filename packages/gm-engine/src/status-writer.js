@@ -1,17 +1,20 @@
 /**
  * StatusWriter — writes .gm-status.json after every run.
+ * Always runs, even on failure.
  */
 export class StatusWriter {
   constructor(worldState) {
     this.ws = worldState;
   }
 
-  async write({ trigger, lettersProcessed, success, error = null, extraData = {} }) {
+  async write({ trigger, lettersProcessed = 0, success, error = null, compressionRan = false, deliveries = [], extraData = {} }) {
     const status = {
       timestamp: new Date().toISOString(),
       trigger,
-      lettersProcessed,
       success,
+      lettersProcessed,
+      compressionRan,
+      deliveries,
       error: error ? String(error) : null,
       ...extraData,
     };

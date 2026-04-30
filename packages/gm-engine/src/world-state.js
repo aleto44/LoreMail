@@ -4,7 +4,7 @@ import matter from 'gray-matter';
 
 /**
  * WorldState — all file reads and writes for the game repo.
- * Enforces append-only access to canon.md.
+ * Enforces append-only access to canon.md (except compression rewrites and character updates).
  */
 export class WorldState {
   constructor(repoPath) {
@@ -30,7 +30,7 @@ export class WorldState {
     await fs.writeFile(full, content, 'utf8');
   }
 
-  /** APPEND-ONLY — the only way to add to canon.md */
+  /** APPEND-ONLY — the only way to add to canon.md (outside of compression) */
   async appendToCanon(text) {
     const filePath = this._resolve('world/canon.md');
     await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -43,6 +43,44 @@ export class WorldState {
     await fs.appendFile(full, '\n' + text, 'utf8');
   }
 
+  /** Parse canon into { deep, recent } section text only, no headers */
+  parseSections(canonText) {
+    const deepMatch = canonText.match(/## DEEP HISTORY\n\*\[.*?\]\*\n\n([\s\S]*?)(?=\n---\n## RECENT HISTORY|$)/);
+    const recentMatch = canonText.match(/## RECENT HISTORY\n\*\[.*?\]\*\n\n([\s\S]*)$/);
+    return {
+      deep: deepMatch ? deepMatch[1].trim() : '',
+      recent: recentMatch ? recentMatch[1].trim() : '',
+    };
+  }
+
+  /** Rebuild canon.md from deep and recent section content */
+  rebuildCanon(deep, recent) {
+    return `## DEEP HISTORY\n*[summarized — compressed from earlier records]*\n\n${deep}\n\n---\n\n## RECENT HISTORY\n*[verbatim — last recorded entries]*\n\n${recent}\n`;
+  }
+
+  /**
+   * Replace only the RECENT HISTORY section. DEEP HISTORY is untouched.
+   * Used by canon-manager after compression.
+   */
+  async replaceRecentHistory(newRecentContent) {
+    const current = await this.readCanon();
+    const { deep } = this.parseSections(current);
+    const rebuilt = this.rebuildCanon(deep, newRecentContent);
+    await this.writeFile('world/canon.md', rebuilt);
+  }
+
+  /**
+   * Append a compressed block to DEEP HISTORY. RECENT HISTORY is untouched.
+   * Used by canon-manager compression.
+   */
+  async appendToDeepHistory(compressedBlock) {
+    const current = await this.readCanon();
+    const { deep, recent } = this.parseSections(current);
+    const newDeep = deep ? `${deep}\n\n${compressedBlock}` : compressedBlock;
+    const rebuilt = this.rebuildCanon(newDeep, recent);
+    await this.writeFile('world/canon.md', rebuilt);
+  }
+
   async readCanon() {
     return await this.readFile('world/canon.md') ?? '';
   }
@@ -51,8 +89,14 @@ export class WorldState {
     return await this.readFile('world/canon-facts.md') ?? '';
   }
 
-  async readEvents() {
-    return await this.readFile('world/events.md') ?? '';
+  /** Returns only the last eventsWindow entries from events.md */
+  async readEvents(eventsWindow = 20) {
+    const raw = await this.readFile('world/events.md') ?? '';
+    const lines = raw.split('\n');
+    // Split on ### date headers
+    const entries = raw.split(/(?=\n### )/).filter(s => s.trim());
+    if (entries.length <= eventsWindow) return raw;
+    return entries.slice(-eventsWindow).join('');
   }
 
   async readGmNotes() {
@@ -89,6 +133,11 @@ export class WorldState {
     await this.writeFile(`players/${playerId}/location.md`, content);
   }
 
+  /** Full rewrite of character.md — only non-append write for player files */
+  async updateCharacter(playerId, content) {
+    await this.writeFile(`players/${playerId}/character.md`, content);
+  }
+
   async writeSeed(content) {
     await this.writeFile('world/seed.md', content);
   }
@@ -98,7 +147,7 @@ export class WorldState {
     const dir = this._resolve('letters/pending');
     try {
       const files = await fs.readdir(dir);
-      return files.filter(f => f.endsWith('.md')).map(f => `letters/pending/${f}`);
+      return files.filter(f => f.endsWith('.md') && f !== '.gitkeep').map(f => `letters/pending/${f}`);
     } catch {
       return [];
     }

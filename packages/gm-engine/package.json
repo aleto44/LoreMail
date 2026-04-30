@@ -4,11 +4,22 @@
   "description": "Reusable GM engine for world-building games",
   "main": "index.js",
   "type": "module",
-  "private": true,
   "scripts": {
     "test": "node --test"
   },
   "dependencies": {
     "gray-matter": "^4.0.3"
+  },
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "src",
+    "index.js",
+    "README.md"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   }
 }

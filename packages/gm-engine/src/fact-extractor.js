@@ -1,6 +1,6 @@
 /**
  * FactExtractor — after each canon addition, extracts concrete facts
- * as a flat bullet list into canon-facts.md.
+ * as a flat bullet list into canon-facts.md. Runs at temperature 0.3.
  */
 export class FactExtractor {
   constructor(worldState, modelClient) {
@@ -9,29 +9,34 @@ export class FactExtractor {
   }
 
   async extractFacts(newCanonText) {
-    if (!newCanonText || !newCanonText.trim()) return;
+    if (!newCanonText?.trim()) return;
+
+    const existingFacts = await this.ws.readFacts();
 
     const messages = [
       {
         role: 'system',
-        content:
-          'You are a precise fact extractor for a world-building game. ' +
-          'Given a passage of canon text, extract all concrete, verifiable facts as a clean bullet list. ' +
-          'Each fact should be a single sentence, specific, and stated as established truth. ' +
-          'Do not include opinions, possibilities, or vague impressions. ' +
-          'Format: one bullet per line starting with "- "',
+        content: `You are extracting hard facts from a world history entry.
+
+Your output is a bullet list only. No preamble. No commentary.
+
+Rules:
+- One fact per bullet
+- Each fact is a single declarative sentence
+- Concrete and specific — names, places, relationships, states of affairs
+- No inference, no interpretation — only what is explicitly stated
+- No duplicates with existing facts (existing facts provided below)`,
       },
       {
         role: 'user',
-        content: `Extract all concrete facts from this canon entry:\n\n${newCanonText}`,
+        content: `EXISTING FACTS:\n${existingFacts || '(none yet)'}\n\nNEW ENTRY TO EXTRACT FROM:\n${newCanonText}\n\nOutput only the new bullet points. If there are no new facts not already captured, output nothing.`,
       },
     ];
 
-    const facts = await this.modelClient.chat(messages, { temperature: 0.1 });
-    if (!facts || !facts.trim()) return;
+    const facts = await this.modelClient.chat(messages, { temperature: 0.3, maxTokens: 800 });
+    if (!facts?.trim()) return;
 
-    const timestamp = new Date().toISOString();
-    const section = `\n<!-- extracted: ${timestamp} -->\n${facts.trim()}\n`;
-    await this.ws.appendToFile('world/canon-facts.md', section);
+    // Append as flat bullets with no heading or date wrapper
+    await this.ws.appendToFile('world/canon-facts.md', facts.trim());
   }
 }

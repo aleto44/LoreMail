@@ -8,7 +8,6 @@ import { StatusWriter } from './status-writer.js';
 
 /**
  * GMEngine — public API for the LoreMail GM engine.
- * Wires all modules together.
  */
 export class GMEngine {
   constructor({ repoPath, model, apiToken, engineConfig = {}, baseUrl }) {
@@ -20,48 +19,60 @@ export class GMEngine {
       model,
       apiToken,
       baseUrl,
-      temperature: engineConfig.temperature ?? 0.4,
+      defaultTemperature: engineConfig.temperature ?? 0.4,
+      defaultMaxTokens: 1500,
     });
     this.canonManager = new CanonManager(this.ws, engineConfig);
     this.factExtractor = new FactExtractor(this.ws, this.modelClient);
     this.consistencyChecker = new ConsistencyChecker(this.ws, this.modelClient);
     this.promptBuilder = new PromptBuilder();
-    this.statusWriter = new StatusWriter(this.ws);
+    this._statusWriter = new StatusWriter(this.ws);
   }
 
   /**
    * Generate the world seed on first game creation.
-   * @param {{ flavour, era, tone, gmStyle, game }} context
+   * Writes seed.md and the first canon entry.
    */
-  async generateWorldSeed({ flavour, era, tone, gmStyle, game }) {
-    const messages = this.promptBuilder.buildSeedPrompt({ flavour, era, tone, gmStyle });
-    const seed = await this.modelClient.chat(messages, { temperature: 0.6, maxTokens: 600 });
-    await this.ws.writeSeed(seed);
+  async generateWorldSeed({ flavour, era, tone, gmStyle, game, founderCharacter }) {
+    const messages = this.promptBuilder.buildSeedPrompt({
+      worldName: game?.name,
+      flavour,
+      era,
+      tone,
+      gmStyle,
+      founderCharacter,
+    });
+
+    const result = await this.modelClient.chatJson(messages, { temperature: 0.6, maxTokens: 800 });
+
+    const seed = result.seed ?? result;
+    const firstCanonEntry = result.first_canon_entry;
+
+    await this.ws.writeSeed(typeof seed === 'string' ? seed : JSON.stringify(seed));
     await this.canonManager.initBlank();
-    return seed;
+
+    if (firstCanonEntry) {
+      await this.canonManager.appendEntry(firstCanonEntry);
+    }
+
+    return { seed, firstCanonEntry };
   }
 
   /**
    * Process a single delivered letter.
-   * @param {{ letter, from, to, game }} context
-   * @returns {object} GM response JSON
+   * Returns a GMDeliveryResult object.
    */
-  async processDelivery({ letter, from, to, game }) {
+  async processDelivery({ letter, from, to, game, sentAt }) {
+    const eventsWindow = this.engineConfig.events_window ?? 20;
+
     const [
-      seed,
-      facts,
-      canonRaw,
-      events,
-      gmNotes,
-      senderCharacter,
-      senderLocation,
-      recipientCharacter,
-      recipientLocation,
+      seed, facts, canonRaw, events, gmNotes,
+      senderCharacter, senderLocation, recipientCharacter, recipientLocation,
     ] = await Promise.all([
       this.ws.readSeed(),
       this.ws.readFacts(),
       this.ws.readCanon(),
-      this.ws.readEvents(),
+      this.ws.readEvents(eventsWindow),
       this.ws.readGmNotes(),
       this.ws.readCharacter(from),
       this.ws.readLocation(from),
@@ -69,58 +80,47 @@ export class GMEngine {
       this.ws.readLocation(to),
     ]);
 
-    // Parse canon sections
-    const deepMatch = canonRaw.match(/## DEEP HISTORY\n[\s\S]*?\n\n([\s\S]*?)(?=---\n## RECENT HISTORY|$)/);
-    const recentMatch = canonRaw.match(/## RECENT HISTORY\n[\s\S]*?\n\n([\s\S]*?)$/);
-    const deepHistory = deepMatch ? deepMatch[1].trim() : '';
-    const recentHistory = recentMatch ? recentMatch[1].trim() : '';
+    const { deep: deepHistory, recent: recentHistory } = this.ws.parseSections(canonRaw);
 
-    // Find sender and recipient player entries in game.json
     const senderPlayer = game.players?.find(p => p.id === from);
     const recipientPlayer = game.players?.find(p => p.id === to);
     const senderName = senderPlayer?.character ?? from;
     const recipientName = recipientPlayer?.character ?? to;
 
     const messages = this.promptBuilder.buildDeliveryPrompt({
-      seed,
-      facts,
-      deepHistory,
-      recentHistory,
-      events,
-      gmNotes,
-      senderCharacter,
-      senderLocation,
-      recipientCharacter,
-      recipientLocation,
-      letterBody: letter,
-      senderName,
-      recipientName,
-      game,
+      seed, facts, deepHistory, recentHistory, events, gmNotes,
+      senderCharacter, senderLocation, recipientCharacter, recipientLocation,
+      letterBody: letter, senderName, recipientName, sentAt, game,
     });
 
-    const raw = await this.modelClient.chat(messages);
     let gmResponse;
     try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      gmResponse = JSON.parse(jsonMatch?.[0] ?? raw);
-    } catch {
-      console.error('Failed to parse GM response:', raw);
-      throw new Error('GM response was not valid JSON');
+      gmResponse = await this.modelClient.chatJson(messages);
+    } catch (err) {
+      throw new Error(`GM model call failed: ${err.message}`);
     }
+
+    // Fill defaults for missing fields
+    gmResponse.next_letter_travel_hours = Math.max(1, parseInt(gmResponse.next_letter_travel_hours) || (game.default_travel_hours ?? 24));
+
+    let canonAdditionToWrite = gmResponse.canon_addition ?? null;
+    let consistencyConflict = false;
 
     // Consistency check before writing
-    if (this.engineConfig.consistency_check && gmResponse.canon_addition) {
-      await this.runConsistencyCheck(gmResponse.canon_addition);
+    if (this.engineConfig.consistency_check !== false && canonAdditionToWrite) {
+      const check = await this.consistencyChecker.check(canonAdditionToWrite);
+      consistencyConflict = !check.consistent;
+      canonAdditionToWrite = check.resolvedAddition;
     }
 
-    // Append canon entry
-    if (gmResponse.canon_addition) {
-      await this.canonManager.appendEntry(gmResponse.canon_addition);
+    // Append canon entry (model produces full ### [DEVELOPING] formatted entry)
+    if (canonAdditionToWrite) {
+      await this.canonManager.appendEntry(canonAdditionToWrite);
     }
 
     // Fact extraction
-    if (this.engineConfig.fact_extraction && gmResponse.canon_addition) {
-      await this.extractFacts(gmResponse.canon_addition);
+    if (this.engineConfig.fact_extraction !== false && canonAdditionToWrite) {
+      await this.factExtractor.extractFacts(canonAdditionToWrite);
     }
 
     // Append world event
@@ -131,41 +131,57 @@ export class GMEngine {
 
     // Append GM notes
     if (gmResponse.gm_notes_addition) {
-      await this.ws.appendToFile('world/gm-notes.md', `\n${gmResponse.gm_notes_addition}`);
+      const timestamp = new Date().toISOString();
+      await this.ws.appendToFile('world/gm-notes.md', `\n<!-- ${timestamp} -->\n${gmResponse.gm_notes_addition}`);
     }
 
-    return gmResponse;
+    // Update character files if model provided updates
+    if (gmResponse.sender_character_update) {
+      await this.ws.updateCharacter(from, gmResponse.sender_character_update);
+    }
+    if (gmResponse.recipient_character_update) {
+      await this.ws.updateCharacter(to, gmResponse.recipient_character_update);
+    }
+
+    return {
+      success: true,
+      canonAddition: canonAdditionToWrite,
+      worldEvent: gmResponse.world_event ?? null,
+      gmNotesAddition: gmResponse.gm_notes_addition ?? null,
+      senderCharacterUpdate: gmResponse.sender_character_update ?? null,
+      recipientCharacterUpdate: gmResponse.recipient_character_update ?? null,
+      senderLocationUpdate: gmResponse.sender_location_update ?? null,
+      recipientLocationUpdate: gmResponse.recipient_location_update ?? null,
+      nextLetterTravelHours: gmResponse.next_letter_travel_hours,
+      consistencyConflict,
+      error: null,
+    };
   }
 
-  /**
-   * Generate the closing chronicle.
-   */
+  /** Generate the closing chronicle */
   async generateChronicle({ game }) {
     const [seed, facts, canon, events] = await Promise.all([
       this.ws.readSeed(),
       this.ws.readFacts(),
       this.ws.readCanon(),
-      this.ws.readEvents(),
+      this.ws.readEvents(100),
     ]);
 
-    // Build character summaries
     const characterParts = await Promise.all(
       (game.players ?? [])
-        .filter(p => p.joined && p.character)
+        .filter(p => p.joined && !p.removed && p.character)
         .map(async p => {
-          const char = await this.ws.readCharacter(p.id);
-          const loc = await this.ws.readLocation(p.id);
+          const [char, loc] = await Promise.all([
+            this.ws.readCharacter(p.id),
+            this.ws.readLocation(p.id),
+          ]);
           return `### ${p.character}\n${char}\nLast known location: ${loc}`;
         }),
     );
-    const characters = characterParts.join('\n\n');
 
     const messages = this.promptBuilder.buildChroniclePrompt({
-      seed,
-      facts,
-      canon,
-      events,
-      characters,
+      seed, facts, canon, events,
+      characters: characterParts.join('\n\n'),
       game,
     });
 
@@ -174,12 +190,9 @@ export class GMEngine {
     return chronicle;
   }
 
-  async runConsistencyCheck(proposedAddition) {
-    return await this.consistencyChecker.check(proposedAddition);
-  }
-
-  async extractFacts(newCanonText) {
-    return await this.factExtractor.extractFacts(newCanonText);
+  /** Write run status — always called by gm.js at the end of a run */
+  async writeStatus(payload) {
+    return await this._statusWriter.write(payload);
   }
 
   async summarizeIfNeeded() {
@@ -190,7 +203,8 @@ export class GMEngine {
     return false;
   }
 
-  get worldState() {
-    return this.ws;
-  }
+  /** Expose statusWriter for gm.js compatibility */
+  get statusWriter() { return this._statusWriter; }
+
+  get worldState() { return this.ws; }
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 export function RestoreFlow({ workerUrl, onRestored }) {
   const [gameId, setGameId] = useState('');
+  const [playerId, setPlayerId] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -11,7 +12,8 @@ export function RestoreFlow({ workerUrl, onRestored }) {
     setLoading(true);
     setError('');
     try {
-      const url = `${workerUrl}/game/player?gameId=${encodeURIComponent(gameId)}&passphrase=${encodeURIComponent(passphrase)}`;
+      const playerParam = playerId.trim() ? `&playerId=${encodeURIComponent(playerId.trim())}` : '';
+      const url = `${workerUrl}/game/player?gameId=${encodeURIComponent(gameId)}&passphrase=${encodeURIComponent(passphrase)}${playerParam}`;
       const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Restore failed');
@@ -22,7 +24,7 @@ export function RestoreFlow({ workerUrl, onRestored }) {
         isFounder: data.isFounder,
         repoOwner: data.repoOwner,
         repoName: data.repoName,
-        gameId,
+        gameId: data.gameId ?? gameId,
       });
     } catch (e) {
       setError(e.message);
@@ -51,6 +53,15 @@ export function RestoreFlow({ workerUrl, onRestored }) {
               value={gameId}
               onChange={e => setGameId(e.target.value)}
               placeholder="crumbling-empire-x7k2p"
+            />
+          </div>
+          <div className="field">
+            <label>Your player ID <span style={{ fontWeight: 400, color: 'var(--faded)' }}>(optional — defaults to founder)</span></label>
+            <input
+              type="text"
+              value={playerId}
+              onChange={e => setPlayerId(e.target.value)}
+              placeholder="maren-voss (leave blank if you are the founder)"
             />
           </div>
           <div className="field">

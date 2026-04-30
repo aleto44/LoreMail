@@ -56,6 +56,7 @@ async function fetchGameData(session) {
     canonRaw,
     eventsRaw,
     statusRaw,
+    seedRaw,
     chronicleRaw,
     gmNotesRaw,
     factsRaw,
@@ -66,6 +67,7 @@ async function fetchGameData(session) {
     getContent('world/canon.md'),
     getContent('world/events.md'),
     getContent('.gm-status.json'),
+    getContent('world/seed.md'),
     isFounder ? getContent('world/chronicle.md') : Promise.resolve(null),
     isFounder ? getContent('world/gm-notes.md') : Promise.resolve(null),
     isFounder ? getContent('world/canon-facts.md') : Promise.resolve(null),
@@ -131,11 +133,30 @@ async function fetchGameData(session) {
     );
   }
 
+  // Always ensure the current player's own character is visible, even if
+  // game.json hasn't been updated yet (e.g. founder before first GM loop).
+  if (!characters[playerId]) {
+    const [char, loc] = await Promise.all([
+      getContent(`players/${playerId}/character.md`),
+      getContent(`players/${playerId}/location.md`),
+    ]);
+    if (char || loc) {
+      const myEntry = game?.players?.find(p => p.id === playerId);
+      characters[playerId] = {
+        character: char,
+        location: loc,
+        name: myEntry?.character ?? session.characterName ?? playerId,
+      };
+    }
+  }
+
   return {
     game,
     canon: canonRaw,
     events: eventsRaw,
     gmStatus,
+    seed: seedRaw,
+    seedGenerating: !seedRaw || seedRaw.includes('*Generating...*'),
     chronicle: chronicleRaw,
     gmNotes: gmNotesRaw,
     facts: factsRaw,

@@ -1,9 +1,3 @@
-// LoreMail GM Engine — main entry point
+// LoreMail GM Engine — public API
+// Only GMEngine is exported. All other modules are internal.
 export { GMEngine } from './src/engine.js';
-export { WorldState } from './src/world-state.js';
-export { CanonManager } from './src/canon-manager.js';
-export { FactExtractor } from './src/fact-extractor.js';
-export { ConsistencyChecker } from './src/consistency.js';
-export { PromptBuilder } from './src/prompt-builder.js';
-export { ModelClient } from './src/model-client.js';
-export { StatusWriter } from './src/status-writer.js';

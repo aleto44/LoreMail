@@ -9,6 +9,9 @@
     "dev:worker": "npm run dev --workspace=apps/worker",
     "dev:launcher": "npm run dev --workspace=apps/launcher",
     "dev:pwa": "npm run dev --workspace=apps/pwa",
-    "test:engine": "npm test --workspace=packages/gm-engine"
+    "dev:launcher:local": "npm run dev:local --workspace=apps/launcher",
+    "dev:pwa:local": "npm run dev:local --workspace=apps/pwa",
+    "test:engine": "npm test --workspace=packages/gm-engine",
+    "generate:engine-files": "node scripts/generate-engine-files.mjs"
   }
 }

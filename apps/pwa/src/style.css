@@ -118,6 +118,61 @@ body {
 .letter-seal:hover { transform: scale(1.05); }
 .letter-seal-label { font-size: 12px; color: var(--faded); }
 
+/* ── Invite envelope animation ── */
+@keyframes envelopeFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes sealShimmer {
+  0%, 100% { filter: drop-shadow(0 2px 6px rgba(122, 59, 30, 0.25)); }
+  50% { filter: drop-shadow(0 4px 14px rgba(122, 59, 30, 0.55)); }
+}
+
+.invite-envelope-wrap {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  padding: 12px;
+  animation: envelopeFloat 3.2s ease-in-out infinite, sealShimmer 3.2s ease-in-out infinite;
+  border-radius: 4px;
+  outline: none;
+}
+
+.invite-envelope-wrap:hover {
+  animation-duration: 1.6s, 1.6s;
+}
+
+.invite-envelope-wrap:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.invite-envelope-wrap.is-opening {
+  animation: none;
+  filter: none;
+  pointer-events: none;
+}
+
+/* ── Invite letter reading ── */
+.invite-letter-splash {
+  padding: 32px 24px;
+  overflow-y: auto;
+}
+
+.invite-letter-paper {
+  max-width: 340px;
+  width: 100%;
+  text-align: left;
+  animation: fadeSlideUp 0.5s ease-out;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Auth form ── */
 .auth-form {
   padding: 32px;
@@ -207,6 +262,7 @@ textarea { resize: vertical; min-height: 120px; }
 }
 
 .letter-row:hover { background: var(--card); }
+.letter-row--sent { opacity: 0.75; }
 
 .letter-dot {
   width: 7px; height: 7px;
@@ -333,6 +389,46 @@ textarea { resize: vertical; min-height: 120px; }
   line-height: 1.8;
   color: var(--ink);
 }
+
+/* ── World seed ── */
+.world-seed {
+  margin-bottom: 4px;
+}
+
+.world-seed-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faded);
+  margin-bottom: 10px;
+}
+
+.seed-generating {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.seed-generating-text {
+  font-size: 13px;
+  color: var(--faded);
+  font-style: italic;
+}
+
+.btn-secondary {
+  margin-top: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--faded);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
 .world-events { margin-top: 24px; }
 .world-events-title {

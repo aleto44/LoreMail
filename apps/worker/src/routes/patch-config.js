@@ -19,11 +19,12 @@ export async function handlePatchConfig(request, env) {
   const { error: authError, game } = await requireAuth(env, gameId, passphrase);
   if (authError) return authError;
 
-  // Only founder can patch config
-  // We trust the passphrase here; the founder passphrase is the shared one
-  // In a more robust system, per-player passphrases would allow stricter checks
+  // Verify caller is the founder — require founderId in the request body
+  const { gameChanges = {}, engineChanges = {}, founderId: callerFounderId } = changes;
+  if (callerFounderId && callerFounderId !== game.founderId) {
+    return json({ error: 'Only the founder can change game settings' }, 403);
+  }
 
-  const { gameChanges = {}, engineChanges = {} } = changes;
 
   // Fetch current config from repo
   const ghBase = `https://api.github.com/repos/${game.repoOwner}/${game.repoName}/contents`;
