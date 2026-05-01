@@ -186,49 +186,51 @@ function MapTab({ worldMap, lastSeen, session, characters }) {
     }
   }
 
-  // When a real map exists but a character's location hasn't been added to
-  // player_locations yet (e.g. a new player whose join triggered a GM run that
-  // hasn't finished), synthesise a node (or match an existing one) so the
-  // character appears on the map immediately.
+  // When a real canon map exists, try to match untracked characters to existing
+  // nodes using word-overlap normalization. We deliberately do NOT create
+  // synthetic nodes here — phantom nodes alongside GM-created canon nodes cause
+  // the duplicate-location bug (e.g. "somewhere on the road…" spawning a second
+  // node next to the GM's "Road Between Unnamed Cities"). Characters whose
+  // location text doesn't fuzzy-match any existing node simply have no map pin
+  // until the GM engine assigns them a player_location entry on the next run.
   if (rawNodes.length > 0 && characters) {
-    const newLocs  = { ...playerLocations };
-    let   newNodes = [...nodes];
-    const synthMap = {};
-    let   changed  = false;
+    const newLocs = { ...playerLocations };
+    let   changed = false;
+
+    // Normalize a label to comparable lowercase words
+    const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
 
     Object.entries(characters).forEach(([pid, charData]) => {
       if (newLocs[pid]) return;                     // already tracked
       if (!charData?.location?.trim()) return;
 
-      const label      = (charData.location.trim().split('\n').find(l => l.trim()) ?? charData.location.trim()).slice(0, 50);
-      const labelLower = label.toLowerCase();
+      const label      = (charData.location.trim().split('\n').find(l => l.trim()) ?? charData.location.trim()).slice(0, 60);
+      const labelNorm  = norm(label);
+      const labelWords = labelNorm.split(' ').filter(w => w.length > 3);
 
-      // Try to match an existing node by label substring
-      const matchNode = newNodes.find(n => {
-        const nl = (n.label ?? '').toLowerCase();
-        return nl.length > 2 && (
-          labelLower.includes(nl.slice(0, Math.min(nl.length, 25))) ||
-          nl.includes(labelLower.slice(0, Math.min(labelLower.length, 25)))
-        );
+      // Match an existing node whose significant words all appear in the
+      // character's location text, or vice-versa.
+      const matchNode = rawNodes.find(n => {
+        const nl = norm(n.label ?? '');
+        if (nl.length < 3) return false;
+        // Direct containment (handles "Bathlam" ↔ "City of Bathlam")
+        if (labelNorm.includes(nl) || nl.includes(labelNorm)) return true;
+        // All significant words of the shorter label appear in the longer string
+        const nlWords   = nl.split(' ').filter(w => w.length > 3);
+        const shorter   = nlWords.length <= labelWords.length ? nlWords : labelWords;
+        const longerStr = nlWords.length <= labelWords.length ? labelNorm : nl;
+        return shorter.length >= 2 && shorter.every(w => longerStr.includes(w));
       });
 
       if (matchNode) {
         newLocs[pid] = matchNode.id;
-      } else {
-        const key = labelLower.replace(/[^a-z0-9]/g, '-');
-        if (!synthMap[key]) {
-          synthMap[key] = { id: `loc-${key}`, label, description: charData.location.trim(), _synthetic: true };
-          newNodes.push(synthMap[key]);
-        }
-        newLocs[pid] = synthMap[key].id;
+        changed = true;
       }
-      changed = true;
+      // No match → leave the character without a map pin for now.
     });
 
     if (changed) {
-      nodes             = newNodes;
-      playerLocations   = newLocs;
-      if (newNodes.length > rawNodes.length) hasSyntheticNodes = true;
+      playerLocations = newLocs;
     }
   }
 
@@ -519,16 +521,23 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
 
       {worldTab === 'characters' && (
         <div style={{ paddingTop: 12 }}>
-          {Object.entries(characters).map(([id, info]) => (
-            <div key={id} className="character-card">
-              <div className="char-name">
-                {info.name ?? id}
-                {id === session.playerId && <span className="char-you">· you</span>}
+          {Object.entries(characters)
+            .sort(([aId], [bId]) => {
+              // Your character always comes first
+              if (aId === session.playerId) return -1;
+              if (bId === session.playerId) return 1;
+              return 0;
+            })
+            .map(([id, info]) => (
+              <div key={id} className="character-card">
+                <div className="char-name">
+                  {info.name ?? id}
+                  {id === session.playerId && <span className="char-you">· you</span>}
+                </div>
+                <div className="char-bio"><ReactMarkdown>{info.character ?? ''}</ReactMarkdown></div>
+                {info.location && <div className="char-location">last known: {info.location}</div>}
               </div>
-              <div className="char-bio"><ReactMarkdown>{info.character ?? ''}</ReactMarkdown></div>
-              {info.location && <div className="char-location">last known: {info.location}</div>}
-            </div>
-          ))}
+            ))}
           {Object.keys(characters).length === 0 && <div className="empty-state">No characters yet.</div>}
         </div>
       )}

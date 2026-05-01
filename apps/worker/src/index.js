@@ -13,6 +13,7 @@ import { handleDeletePlayer } from './routes/delete-player.js';
 import { handleGameInfo } from './routes/game-info.js';
 import { handleListModels, handleProbeModel } from './routes/list-models.js';
 import { handleTriggerSeed } from './routes/trigger-seed.js';
+import { handleDeleteRepo } from './routes/delete-repo.js';
 import { corsHeaders, handleCors } from './lib/cors.js';
 
 export default {
@@ -37,6 +38,7 @@ export default {
       if (method === 'GET' && path === '/models/list') return handleListModels(request, env);
       if (method === 'POST' && path === '/models/probe') return handleProbeModel(request, env);
       if (method === 'POST' && path === '/game/trigger-seed') return handleTriggerSeed(request, env);
+      if (method === 'DELETE' && path === '/game/repo') return handleDeleteRepo(request, env);
 
       return json({ error: 'Not found' }, 404);
     } catch (err) {

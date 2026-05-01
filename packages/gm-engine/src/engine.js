@@ -210,15 +210,34 @@ export class GMEngine {
       return { success: true, skipped: true, reason: 'no location set' };
     }
 
-    // Check if a node for this location already exists (by label, case-insensitive)
     const map = await this.ws.readWorldJson('world/map.json');
-    const locationLower = location.toLowerCase();
-    const alreadyOnMap = map.nodes.some(
-      n => n.label.toLowerCase() === locationLower
-        || n.id === locationLower.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-    );
-    if (alreadyOnMap) {
-      return { success: true, skipped: true, reason: 'location already on map' };
+
+    // Normalize helper: lowercase, collapse non-alphanumeric to spaces
+    const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    const locNorm  = norm(location);
+    const locWords = locNorm.split(' ').filter(w => w.length > 3);
+
+    // Check if a node for this location already exists (exact label, id, or
+    // fuzzy word-overlap match so we don't duplicate near-identical place names)
+    const matchingNode = map.nodes.find(n => {
+      const nl = norm(n.label ?? '');
+      if (!nl) return false;
+      if (nl === locNorm) return true;
+      if (n.id === locNorm.replace(/\s+/g, '-')) return true;
+      // All significant words of the shorter label appear in the longer string
+      const nlWords   = nl.split(' ').filter(w => w.length > 3);
+      const shorter   = nlWords.length <= locWords.length ? nlWords : locWords;
+      const longerStr = nlWords.length <= locWords.length ? locNorm : nl;
+      return shorter.length >= 2 && shorter.every(w => longerStr.includes(w));
+    });
+
+    if (matchingNode) {
+      // Location is already represented on the map — link the player to that node
+      // instead of creating a duplicate, then exit early.
+      if (!map.player_locations?.[playerId]) {
+        await this.ws.updatePlayerLocationOnMap(playerId, matchingNode.id);
+      }
+      return { success: true, skipped: true, reason: 'location already on map', nodeId: matchingNode.id };
     }
 
     const playerEntry = game.players?.find(p => p.id === playerId);
@@ -226,6 +245,7 @@ export class GMEngine {
 
     const messages = this.promptBuilder.buildPlayerJoinPrompt({
       seed, facts, playerCharacter, playerLocation: location, characterName, game,
+      existingNodes: map.nodes,   // give the GM the current node list to avoid duplication
     });
 
     let gmResponse;

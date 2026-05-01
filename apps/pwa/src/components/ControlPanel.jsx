@@ -252,6 +252,8 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   }
 
    async function deleteRepository() {
+     if (!passphrase) { setMsg('Enter your passphrase first.'); return; }
+
      const confirmed = confirm(
        `⚠️ PERMANENTLY DELETE REPOSITORY?\n\n` +
        `"${session.repoName}" will be completely removed from GitHub.\n` +
@@ -268,25 +270,18 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
      if (!doubleConfirmed) return;
 
      try {
-       const res = await fetch(
-         `https://api.github.com/repos/${session.repoOwner}/${session.repoName}`,
-         {
-           method: 'DELETE',
-           headers: {
-             Authorization: `Bearer ${session.githubToken}`,
-             Accept: 'application/vnd.github+json',
-             'X-GitHub-Api-Version': '2022-11-28',
-             'Content-Type': 'application/json',
-           },
-         },
-       );
-       if (res.ok || res.status === 204) {
+       const res = await fetch(`${workerUrl}/game/repo`, {
+         method: 'DELETE',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ gameId: session.gameId, passphrase }),
+       });
+       if (res.ok) {
          setMsg('Repository deleted successfully.');
        } else {
-         const d = await res.json();
-         let errMsg = d.message ?? 'unknown error';
+         const d = await res.json().catch(() => ({}));
+         let errMsg = d.error ?? 'unknown error';
          if (res.status === 403) {
-           errMsg = 'Permission denied. Your GitHub token needs the "delete_repo" scope to delete repositories.';
+           errMsg = 'Permission denied — the stored GitHub token needs the "Administration: Read and write" permission (fine-grained PAT) or "delete_repo" scope (classic PAT).';
          }
          setMsg('Delete failed: ' + errMsg);
        }

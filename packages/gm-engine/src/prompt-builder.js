@@ -54,12 +54,20 @@ Respond with JSON only:
     ];
   }
 
-  buildPlayerJoinPrompt({ seed, facts, playerCharacter, playerLocation, characterName, game }) {
+  buildPlayerJoinPrompt({ seed, facts, playerCharacter, playerLocation, characterName, game, existingNodes = [] }) {
     const today = new Date().toISOString().split('T')[0];
     const system = `You are the Game Master of a living epistolary world.
 Your only output is a JSON object. You never explain yourself.
 Write in third person, past tense. Measured, authoritative, unhurried.
 A new character has arrived in the world. Their starting location is player-established fact — it belongs on the world map.`;
+
+    const existingNodesBlock = existingNodes.length > 0
+      ? `EXISTING MAP NODES (do not duplicate these)
+────────────────────────────────────────────
+${existingNodes.map(n => `  id: "${n.id}"  label: "${n.label}"`).join('\n')}
+
+IMPORTANT: If the player's starting location "${playerLocation}" matches or is essentially the same place as any node above, do NOT add a new_node for it. Instead, set player_location_node_id to the matching existing node's id. Only add to new_nodes if the location is genuinely a new, distinct place not represented above.`
+      : '';
 
     const user = `A new character has joined the world.
 
@@ -69,10 +77,11 @@ Starting location: ${playerLocation}
 
 ${seed ? `WORLD SEED\n──────────\n${seed}` : ''}
 ${facts?.trim() ? `\nESTABLISHED FACTS\n─────────────────\n${facts}` : ''}
+${existingNodesBlock ? `\n${existingNodesBlock}` : ''}
 
-The character's starting location "${playerLocation}" is player-established fact and MUST be added to the world map as a new node, unless a node with that label already exists.
+The character's starting location "${playerLocation}" is player-established fact and MUST be represented on the world map — either by matching it to an existing node (preferred if the place is the same) or by adding it as a new node.
 
-If the location name implies a sub-area of a larger settlement (e.g. "Kingsland Outskirts" implies "Kingsland"), add both the sub-area AND the parent as separate nodes, with an edge connecting them.
+If the location name implies a sub-area of a larger settlement (e.g. "Kingsland Outskirts" implies "Kingsland"), add both the sub-area AND the parent as separate nodes, with an edge connecting them — unless the parent already exists above.
 
 Use a stable lowercase hyphenated id derived from the location name. e.g. "brethlaham", "kingsland-outskirts".
 
@@ -93,7 +102,7 @@ canon_addition: A brief [DEVELOPING] entry (60–100 words) establishing this ch
   null if no canon entry is warranted.
 world_event: One past-tense sentence recording this character's arrival. Or null.
 gm_notes_addition: Your private notes on this character and how they fit the world. Always populate.
-player_location_node_id: The stable node id of the player's starting location (the node you just added, or existing).`;
+player_location_node_id: The stable node id for the player's current location — either an existing node id from the list above, or the id of a new node you just added. This field is REQUIRED and must never be null.`;
 
     return [
       { role: 'system', content: system },
@@ -297,7 +306,9 @@ sender_location_node_id / recipient_location_node_id
   If the sender/recipient's current location corresponds to a node that exists (or was just added)
   in map.json, provide its stable node id here. e.g. "crull-waystation".
   This is used to show player character positions on the map.
-  null if the location is not a known map node or has not changed.
+  Check the SENDER / RECIPIENT "Last known location" fields carefully — if the location text
+  matches (even loosely) an existing map node, always set this field. Only set to null if the
+  character's location is genuinely unknown or not on the map at all.
 
 sender_character_update / recipient_character_update
   Full updated character.md content if something meaningful has changed. null otherwise.
