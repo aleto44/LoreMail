@@ -36,10 +36,11 @@ async function probeModel(modelId, token) {
 
 export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle }) {
   const [gmPaused, setGmPaused] = useState(data?.game?.gm_paused ?? false);
+  const [instantDelivery, setInstantDelivery] = useState(data?.game?.instant_delivery ?? false);
   const [model, setModel] = useState(data?.game?.model ?? '');
   const [gmStyle, setGmStyle] = useState(data?.game?.gm_style ?? 'medium');
   const [travelHours, setTravelHours] = useState(data?.game?.default_travel_hours ?? 24);
-  const [passphrase, setPassphrase] = useState('');
+  const [passphrase, setPassphrase] = useState(() => sessionStorage.getItem('lm_passphrase') ?? '');
   const [pat, setPat] = useState('');
   const [verifiedModels, setVerifiedModels] = useState([]);
   const [verifying, setVerifying] = useState(false);
@@ -54,15 +55,15 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   const characters = data?.characters ?? {};
 
   async function patchConfig(changes) {
-    if (!passphrase) { setMsg('Enter your passphrase first.'); return; }
+    if (!passphrase) { setMsg('Enter your passphrase first.'); return false; }
     const res = await fetch(`${workerUrl}/game/config`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ gameId: session.gameId, passphrase, changes: { ...changes, founderId: session.playerId } }),
     });
     const d = await res.json();
-    if (!res.ok) { setMsg(d.error); return; }
-    setMsg('Saved.'); onRefresh();
+    if (!res.ok) { setMsg(d.error); return false; }
+    setMsg('Saved.'); onRefresh(); return true;
   }
 
   async function handleVerifyModels() {
@@ -230,7 +231,7 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
         <input
           type="password"
           value={passphrase}
-          onChange={e => setPassphrase(e.target.value)}
+          onChange={e => { setPassphrase(e.target.value); sessionStorage.setItem('lm_passphrase', e.target.value); }}
           placeholder="Enter passphrase to make changes"
         />
         {msg && <div style={{ fontSize: 13, marginTop: 8, color: 'var(--accent)' }}>{msg}</div>}
@@ -304,7 +305,7 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
                 key={s}
                 className="btn-ghost"
                 style={gmStyle === s ? { background: 'var(--ink)', color: 'white', border: 'none' } : {}}
-                onClick={() => { setGmStyle(s); patchConfig({ gameChanges: { gm_style: s } }); }}
+                onClick={async () => { const ok = await patchConfig({ gameChanges: { gm_style: s } }); if (ok) setGmStyle(s); }}
               >
                 {s}
               </button>
@@ -316,7 +317,15 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
           <label>GM Paused</label>
           <button
             className={`toggle${gmPaused ? ' on' : ''}`}
-            onClick={() => { setGmPaused(!gmPaused); patchConfig({ gameChanges: { gm_paused: !gmPaused } }); }}
+            onClick={async () => { const next = !gmPaused; const ok = await patchConfig({ gameChanges: { gm_paused: next } }); if (ok) setGmPaused(next); }}
+          />
+        </div>
+
+        <div className="control-row">
+          <label>⚡ Instant Delivery <span style={{ fontSize: 11, color: 'var(--faded)' }}>(dev)</span></label>
+          <button
+            className={`toggle${instantDelivery ? ' on' : ''}`}
+            onClick={async () => { const next = !instantDelivery; const ok = await patchConfig({ gameChanges: { instant_delivery: next } }); if (ok) setInstantDelivery(next); }}
           />
         </div>
 

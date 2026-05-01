@@ -8,6 +8,7 @@ export function ComposeScreen({ session, data, onSent, onCancel }) {
   const [error, setError] = useState('');
 
   const game = data?.game;
+  const instantDelivery = game?.instant_delivery ?? false;
   const travelHours = game?.default_travel_hours ?? 24;
 
   const recipients = (game?.players ?? [])
@@ -24,7 +25,7 @@ export function ComposeScreen({ session, data, onSent, onCancel }) {
 
       // Build letter file
       const sentAt = Math.floor(Date.now() / 1000);
-      const deliverAt = sentAt + travelHours * 3600;
+      const deliverAt = instantDelivery ? sentAt : sentAt + travelHours * 3600;
       const uuid = crypto.randomUUID().replace(/-/g, '');
       const filename = `${deliverAt}_${session.playerId}_${to}_${uuid}.md`;
       const frontmatter = `---\nfrom: ${session.playerId}\nto: ${to}\nsent_at: ${sentAt}\ndeliver_at: ${deliverAt}\ndelivered: false\n---\n`;
@@ -104,7 +105,9 @@ export function ComposeScreen({ session, data, onSent, onCancel }) {
           />
         </div>
         <div className="compose-eta">
-          will arrive in approximately {travelHours} hours
+          {instantDelivery
+            ? '⚡ instant delivery (dev mode)'
+            : `will arrive in approximately ${travelHours} hours`}
         </div>
         {error && <div className="error-msg">{error}</div>}
       </div>

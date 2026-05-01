@@ -2,7 +2,7 @@ import { json } from '../index.js';
 import { requireBody, requireAuth, putGame } from '../lib/auth.js';
 import { createFile } from '../lib/github.js';
 
-const ALLOWED_GAME_FIELDS = ['gm_style', 'gm_paused', 'model', 'default_travel_hours'];
+const ALLOWED_GAME_FIELDS = ['gm_style', 'gm_paused', 'model', 'default_travel_hours', 'instant_delivery'];
 const ALLOWED_ENGINE_FIELDS = [
   'canon_recent_word_limit',
   'canon_deep_summary_target',
