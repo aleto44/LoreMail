@@ -49,6 +49,9 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   const [showFacts, setShowFacts] = useState(false);
   const [showLockPanel, setShowLockPanel] = useState(false);
   const [msg, setMsg] = useState('');
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteLetterBody, setInviteLetterBody] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const game = data?.game;
   const status = data?.gmStatus;
@@ -128,6 +131,31 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
       setTimeout(() => { onRefresh(); onChronicle(); }, 60000);
     } else {
       setMsg('Trigger failed — check your GitHub token has workflow permissions.');
+    }
+  }
+
+  async function sendInvite() {
+    if (!passphrase) { setMsg('Enter passphrase first.'); return; }
+    if (!inviteLetterBody.trim()) { setMsg('Write an invite letter first.'); return; }
+    setInviteLoading(true);
+    setMsg('');
+    try {
+      const res = await fetch(`${workerUrl}/game/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: session.gameId, passphrase, letterBody: inviteLetterBody.trim() }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? 'Invite failed');
+      await navigator.clipboard.writeText(d.inviteLink).catch(() => {});
+      setMsg(`Invite link copied! Share it with your new player.`);
+      setInviteLetterBody('');
+      setShowInviteForm(false);
+      onRefresh();
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setInviteLoading(false);
     }
   }
 
@@ -434,6 +462,31 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
             )}
           </div>
         ))}
+
+        <button className="control-btn" style={{ marginTop: 8 }} onClick={() => setShowInviteForm(v => !v)}>
+          {showInviteForm ? 'Cancel' : '+ Invite New Player'}
+        </button>
+        {showInviteForm && (
+          <div style={{ paddingTop: 12 }}>
+            <p style={{ fontSize: 12, color: 'var(--faded)', marginBottom: 8, lineHeight: 1.5 }}>
+              Write a letter to your new player — it will be waiting for them when they open their invite link.
+            </p>
+            <textarea
+              value={inviteLetterBody}
+              onChange={e => setInviteLetterBody(e.target.value)}
+              placeholder="The world is changing. Your presence is needed…"
+              rows={5}
+              style={{ marginBottom: 8 }}
+            />
+            <button
+              className="btn-primary"
+              onClick={sendInvite}
+              disabled={inviteLoading || !passphrase}
+            >
+              {inviteLoading ? 'Sending…' : 'Send Invite & Copy Link →'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Game health */}

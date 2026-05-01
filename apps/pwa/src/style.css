@@ -373,11 +373,16 @@ textarea { resize: vertical; min-height: 120px; }
   display: flex;
   border-bottom: 1px solid var(--border);
   padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.world-tabs::-webkit-scrollbar { display: none; }
 
 .world-tab {
+  flex-shrink: 0;
   padding: 10px 0;
-  margin-right: 24px;
+  margin-right: 20px;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -388,9 +393,234 @@ textarea { resize: vertical; min-height: 120px; }
   border-top: none;
   border-left: none;
   border-right: none;
+  position: relative;
+  white-space: nowrap;
 }
 
 .world-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+
+/* Unseen dot on world sub-tabs */
+.world-tab-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 4px;
+  vertical-align: middle;
+  margin-bottom: 1px;
+}
+
+/* ── Lore cards (Timeline / People / Factions) ── */
+.lore-list {
+  padding: 12px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lore-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 16px;
+}
+
+.lore-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-bottom: 8px;
+}
+
+.lore-badge--new     { background: var(--accent); color: var(--paper); }
+.lore-badge--updated { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+
+.lore-card-name {
+  font-weight: 500;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.lore-card-body {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.lore-card-status {
+  font-size: 12px;
+  color: var(--faded);
+  font-style: italic;
+}
+
+.lore-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.lore-tags {
+  font-size: 11px;
+  color: var(--faded);
+  letter-spacing: 0.03em;
+}
+
+.lore-time {
+  font-size: 11px;
+  color: var(--faded);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* ── Map ── */
+.map-container {
+  position: relative;
+  width: 100%;
+}
+
+.map-svg {
+  width: 100%;
+  height: 360px;
+  display: block;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.map-edge {
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.map-edge-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  fill: var(--faded);
+  text-anchor: middle;
+}
+
+.map-node {
+  fill: var(--card);
+  stroke: var(--faded);
+  stroke-width: 1.5;
+  transition: stroke 0.15s, fill 0.15s;
+}
+
+.map-node--new {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+@keyframes mapNodePulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+.map-node--new {
+  animation: mapNodePulse 2s ease-in-out 3;
+}
+
+.map-node--selected {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.map-node-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  fill: var(--ink);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.map-node-group:hover .map-node {
+  stroke: var(--ink);
+}
+
+.map-detail-panel {
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  padding: 16px;
+}
+
+.map-detail-name {
+  font-weight: 500;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.map-detail-desc {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.map-detail-connections { margin-bottom: 10px; }
+
+.map-detail-connections-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faded);
+  margin-bottom: 4px;
+}
+
+.map-detail-connection {
+  font-size: 13px;
+  color: var(--ink);
+  padding: 2px 0;
+}
+
+.map-detail-time {
+  font-size: 12px;
+  color: var(--faded);
+  margin-bottom: 12px;
+}
+
+.map-node--pc {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+
+.map-detail-players {
+  font-size: 12px;
+  color: var(--faded);
+  margin-bottom: 8px;
+  letter-spacing: 0.03em;
+}
+
+.map-detail-close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--faded);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.map-detail-close:hover { border-color: var(--ink); color: var(--ink); }
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 12px;
+  font-size: 11px;
+  color: var(--faded);
+}
+
+.map-legend-item { white-space: nowrap; }
+.map-legend-item--pc   { color: var(--ink); }
+.map-legend-item--new  { color: var(--accent); }
+.map-legend-sep { margin-left: auto; }
 
 .world-content { padding: 20px 16px; }
 
@@ -585,6 +815,52 @@ textarea { resize: vertical; min-height: 120px; }
 }
 
 .chronicle-body { font-size: 15px; white-space: pre-wrap; }
+
+/* ── Player ID footer ── */
+.player-id-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 80px;
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--faded);
+}
+
+.player-id-label {
+  display: inline;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  color: var(--faded);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.player-id-value {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--ink);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-id-copy {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--faded);
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.player-id-copy:hover { border-color: var(--ink); color: var(--ink); }
 
 /* ── Misc ── */
 .error-msg { color: #c0392b; font-size: 13px; margin-top: 8px; }

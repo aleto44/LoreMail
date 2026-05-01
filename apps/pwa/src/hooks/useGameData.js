@@ -98,6 +98,10 @@ async function fetchGameData(session) {
     factsRaw,
     pendingFiles,
     deliveredFiles,
+    mapRaw,
+    peopleRaw,
+    factionsRaw,
+    timelineRaw,
   ] = await Promise.all([
     getContent('config/game.json'),
     getContent('config/engine.json'),
@@ -110,6 +114,10 @@ async function fetchGameData(session) {
     isFounder ? getContent('world/canon-facts.md') : Promise.resolve(null),
     listDir('letters/pending'),
     listDir('letters/delivered'),
+    getContent('world/map.json'),
+    getContent('world/people.json'),
+    getContent('world/factions.json'),
+    getContent('world/timeline.json'),
   ]);
 
   const game = gameJsonRaw ? JSON.parse(gameJsonRaw) : null;
@@ -211,6 +219,10 @@ async function fetchGameData(session) {
     deliveredLetters: myDelivered.sort((a, b) => b.deliverAt - a.deliverAt),
     pendingLetters: myPending,
     characters,
+    worldMap:      mapRaw      ? JSON.parse(mapRaw)      : { nodes: [], edges: [] },
+    worldPeople:   peopleRaw   ? JSON.parse(peopleRaw)   : { people: [] },
+    worldFactions: factionsRaw ? JSON.parse(factionsRaw) : { factions: [] },
+    worldTimeline: timelineRaw ? JSON.parse(timelineRaw) : { entries: [] },
   };
 }
 

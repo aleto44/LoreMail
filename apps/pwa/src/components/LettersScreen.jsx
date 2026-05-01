@@ -1,6 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export function LettersScreen({ session, data, loading, onReadLetter }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyPlayerId() {
+    navigator.clipboard.writeText(session.playerId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
+
   if (loading && !data) {
     return <div className="loading">Loading letters…</div>;
   }
@@ -76,6 +85,11 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
           ))}
         </>
       )}
+      <div className="player-id-footer">
+        <span className="player-id-label">Your player ID</span>
+        <span className="player-id-value">{session.playerId}</span>
+        <button className="player-id-copy" onClick={copyPlayerId}>{copied ? '✓' : 'copy'}</button>
+      </div>
     </div>
   );
 }

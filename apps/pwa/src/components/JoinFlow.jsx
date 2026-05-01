@@ -101,6 +101,7 @@ export function JoinFlow({ gameId, inviteToken, workerUrl, onJoined }) {
   const name = rawName ? rawName.toUpperCase().split('').join('\u200a') : null;
   const excerpt = worldInfo?.seedExcerpt ?? DEFAULT_EXCERPT;
   const inviteLetter = worldInfo?.inviteLetter ?? null;
+  const founderName = worldInfo?.founderName ?? null;
 
   if (step === 'loading') {
     return (
@@ -144,6 +145,9 @@ export function JoinFlow({ gameId, inviteToken, workerUrl, onJoined }) {
         <div className="splash-divider" style={{ margin: '16px auto' }} />
         <div className="letter-paper invite-letter-paper">
           <div>{inviteLetter ?? DEFAULT_EXCERPT}</div>
+          {founderName && (
+            <div className="letter-signature" style={{ marginTop: 28 }}>— {founderName}</div>
+          )}
         </div>
         <button
           className="btn-primary"

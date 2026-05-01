@@ -189,4 +189,107 @@ export class WorldState {
     const raw = await this.readFile('.gm-status.json');
     return raw ? JSON.parse(raw) : null;
   }
+
+  // ─── World lore JSON files ────────────────────────────────────────────────
+
+  static _worldJsonDefaults = {
+    'world/map.json':      { nodes: [], edges: [], player_locations: {} },
+    'world/people.json':   { people: [] },
+    'world/factions.json': { factions: [] },
+    'world/timeline.json': { entries: [] },
+  };
+
+  async readWorldJson(relPath) {
+    const raw = await this.readFile(relPath);
+    const def = JSON.parse(JSON.stringify(WorldState._worldJsonDefaults[relPath] ?? {}));
+    if (!raw) return def;
+    try { return JSON.parse(raw); } catch { return def; }
+  }
+
+  async writeWorldJson(relPath, data) {
+    await this.writeFile(relPath, JSON.stringify(data, null, 2));
+  }
+
+  /** Upsert nodes and edges into world/map.json. Skips duplicates by id / from:to key. */
+  async updateMapJson({ new_nodes, new_edges }, now) {
+    const map = await this.readWorldJson('world/map.json');
+    const existingNodeIds = new Set(map.nodes.map(n => n.id));
+    const existingEdgeKeys = new Set([
+      ...map.edges.map(e => `${e.from}:${e.to}`),
+      ...map.edges.map(e => `${e.to}:${e.from}`),
+    ]);
+    for (const node of (new_nodes ?? [])) {
+      if (!existingNodeIds.has(node.id)) {
+        map.nodes.push({ ...node, first_mentioned: now });
+        existingNodeIds.add(node.id);
+      }
+    }
+    for (const edge of (new_edges ?? [])) {
+      const key = `${edge.from}:${edge.to}`;
+      if (!existingEdgeKeys.has(key)) {
+        map.edges.push({ ...edge, first_mentioned: now });
+        existingEdgeKeys.add(key);
+        existingEdgeKeys.add(`${edge.to}:${edge.from}`);
+      }
+    }
+    await this.writeWorldJson('world/map.json', map);
+  }
+
+  /** Add new NPCs / apply status+description updates into world/people.json. */
+  async updatePeopleJson({ new_people, updated_people }, now) {
+    const data = await this.readWorldJson('world/people.json');
+    for (const person of (new_people ?? [])) {
+      if (!data.people.find(p => p.id === person.id)) {
+        data.people.push({ ...person, first_mentioned: now, last_updated: now });
+      }
+    }
+    for (const update of (updated_people ?? [])) {
+      const existing = data.people.find(p => p.id === update.id);
+      if (existing) {
+        if (update.description != null) existing.description = update.description;
+        if (update.status != null) existing.status = update.status;
+        existing.last_updated = now;
+      }
+    }
+    await this.writeWorldJson('world/people.json', data);
+  }
+
+  /** Add new factions / apply updates into world/factions.json. */
+  async updateFactionsJson({ new_factions, updated_factions }, now) {
+    const data = await this.readWorldJson('world/factions.json');
+    for (const faction of (new_factions ?? [])) {
+      if (!data.factions.find(f => f.id === faction.id)) {
+        data.factions.push({ ...faction, first_mentioned: now, last_updated: now });
+      }
+    }
+    for (const update of (updated_factions ?? [])) {
+      const existing = data.factions.find(f => f.id === update.id);
+      if (existing) {
+        if (update.description != null) existing.description = update.description;
+        if (update.disposition != null) existing.disposition = update.disposition;
+        existing.last_updated = now;
+      }
+    }
+    await this.writeWorldJson('world/factions.json', data);
+  }
+
+  /** Append a single entry to world/timeline.json. Skips if id already exists. */
+  async appendTimelineEntry(entry, now) {
+    const data = await this.readWorldJson('world/timeline.json');
+    if (!data.entries.find(e => e.id === entry.id)) {
+      data.entries.push({ ...entry, timestamp: now });
+    }
+    await this.writeWorldJson('world/timeline.json', data);
+  }
+
+  /** Record which map node a player character is currently at. */
+  async updatePlayerLocationOnMap(playerId, nodeId) {
+    const map = await this.readWorldJson('world/map.json');
+    if (!map.player_locations) map.player_locations = {};
+    // Only update if the node actually exists in the map
+    if (nodeId && map.nodes.find(n => n.id === nodeId)) {
+      map.player_locations[playerId] = nodeId;
+      await this.writeWorldJson('world/map.json', map);
+    }
+  }
 }

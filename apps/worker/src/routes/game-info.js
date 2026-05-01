@@ -62,7 +62,9 @@ export async function handleGameInfo(request, env) {
   } catch (e) {
     console.warn('Failed to fetch world info:', e.message);
   }
-  return json({ worldName, seedExcerpt, inviteeName: invite.inviteeName ?? null, inviteLetter });
+  const founderPlayer = game.players?.find(p => p.is_founder || p.id === game.founderId);
+  const founderName = founderPlayer?.character ?? null;
+  return json({ worldName, seedExcerpt, inviteeName: invite.inviteeName ?? null, inviteLetter, founderName });
 }
 
 async function fetchInviteLetter(game, invite, headers, GH_API) {

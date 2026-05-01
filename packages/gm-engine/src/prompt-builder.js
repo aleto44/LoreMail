@@ -34,11 +34,17 @@ Produce:
 1. seed — 250–300 word world introduction. Third person, past tense, chronicle voice. Set scene, era, atmosphere, central tension. Do not resolve anything. End with the world in motion.
 2. first_canon_entry — one [DEVELOPING] entry, 80–120 words.
    Format exactly: ### [DEVELOPING] {Short title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
+3. map_updates — seed the world map with the founder's starting location as the first node.
+   Use a stable lowercase hyphenated id. e.g. "crull-waystation". No edges yet.
 
 Respond with JSON only:
 {
   "seed": string,
-  "first_canon_entry": string
+  "first_canon_entry": string,
+  "map_updates": {
+    "new_nodes": [{ "id": string, "label": string, "description": string }],
+    "new_edges": null
+  }
 }`;
     return [
       { role: 'system', content: system },
@@ -140,6 +146,46 @@ In that case, set canon_addition and world_event to null.
 When in doubt: less is more. A sparse canon is more coherent than an overcrowded one.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WORLD STRUCTURE EXTRACTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After every delivery you may extract structured world data. These fields are strictly optional —
+only populate them when the letter genuinely canonizes something new.
+
+Extract conservatively. Only add a person, place, or faction to structured data if it is
+genuinely established in this letter — not merely mentioned speculatively.
+
+PEOPLE (new_people / updated_people):
+- new_people: NPCs the GM is introducing for the first time. NEVER include player characters.
+- If a letter names an individual — any named person who is clearly real in the world — add them.
+  A name is explicit enough. You do not need lengthy description to justify the entry.
+  If little is known, a sparse description is fine: "Known to [sender]. Little else recorded."
+- updated_people: existing NPCs whose status or description has meaningfully changed.
+- id: stable, lowercase, hyphenated slug. Once set, never changed. e.g. "warden-holt"
+- status: one short phrase only. e.g. "whereabouts unknown", "last seen in Crull", "deceased"
+- description: 1–3 sentences. What the world knows about them. Sparse is fine for new names.
+
+FACTIONS (new_factions / updated_factions):
+- Organizations, guilds, governments, and named groups only.
+- id: stable slug. e.g. "cartographers-guild"
+- disposition: one word or short phrase. e.g. "allied", "hostile", "uncertain", "defunct"
+- description: 1–3 sentences. What is publicly known.
+
+MAP (map_updates):
+- new_nodes: named locations being established for the first time.
+  id: stable slug e.g. "crull-waystation", label: display name, description: 1–2 sentences.
+- new_edges: routes or distances between two known nodes being established.
+  from/to: existing node ids. label: travel description e.g. "three days by road". travel_hours: integer.
+- Edges are bidirectional by default. Only add an edge when the letter implies a specific route or distance.
+- Do not add nodes for vague references ("somewhere in the east"). Only named, established places.
+
+TIMELINE (timeline_entry):
+- One entry per delivery, only when canon_addition is non-null.
+- id: unique slug e.g. "entry-crull-smoke-001"
+- summary: 1–2 sentences. What happened, in plain English.
+- tags: array of node ids and faction ids relevant to this entry.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -151,9 +197,17 @@ Respond ONLY with a single JSON object. No preamble. No commentary. No markdown 
   "gm_notes_addition": string | null,
   "sender_location_update": string | null,
   "recipient_location_update": string | null,
+  "sender_location_node_id": string | null,
+  "recipient_location_node_id": string | null,
   "sender_character_update": string | null,
   "recipient_character_update": string | null,
-  "next_letter_travel_hours": integer
+  "next_letter_travel_hours": integer,
+  "map_updates": { "new_nodes": [...] | null, "new_edges": [...] | null } | null,
+  "new_people": [...] | null,
+  "updated_people": [...] | null,
+  "new_factions": [...] | null,
+  "updated_factions": [...] | null,
+  "timeline_entry": { "id": string, "summary": string, "tags": [...] } | null
 }
 
 Field rules:
@@ -179,11 +233,20 @@ gm_notes_addition
 sender_location_update / recipient_location_update
   Short plain-English location string. null if unchanged or cannot be inferred.
 
+sender_location_node_id / recipient_location_node_id
+  If the sender/recipient's current location corresponds to a node that exists (or was just added)
+  in map.json, provide its stable node id here. e.g. "crull-waystation".
+  This is used to show player character positions on the map.
+  null if the location is not a known map node or has not changed.
+
 sender_character_update / recipient_character_update
   Full updated character.md content if something meaningful has changed. null otherwise.
 
 next_letter_travel_hours
-  Integer. Never 0. Minimum 1.`;
+  Integer. Never 0. Minimum 1.
+
+map_updates / new_people / updated_people / new_factions / updated_factions / timeline_entry
+  All optional. null if nothing applies. See WORLD STRUCTURE EXTRACTION above.`;
   }
 
   _gmStyleBlock(style) {

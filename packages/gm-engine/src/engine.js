@@ -55,6 +55,12 @@ export class GMEngine {
       await this.canonManager.appendEntry(firstCanonEntry);
     }
 
+    // Seed the founder's starting location as the first map node
+    if (result.map_updates) {
+      const now = Math.floor(Date.now() / 1000);
+      await this.ws.updateMapJson(result.map_updates, now);
+    }
+
     return { seed, firstCanonEntry };
   }
 
@@ -141,6 +147,35 @@ export class GMEngine {
     }
     if (gmResponse.recipient_character_update) {
       await this.ws.updateCharacter(to, gmResponse.recipient_character_update);
+    }
+
+    // Write world lore JSON files
+    const loreNow = Math.floor(Date.now() / 1000);
+    if (gmResponse.map_updates?.new_nodes?.length || gmResponse.map_updates?.new_edges?.length) {
+      await this.ws.updateMapJson(gmResponse.map_updates, loreNow);
+    }
+    if (gmResponse.new_people?.length || gmResponse.updated_people?.length) {
+      await this.ws.updatePeopleJson({
+        new_people: gmResponse.new_people,
+        updated_people: gmResponse.updated_people,
+      }, loreNow);
+    }
+    if (gmResponse.new_factions?.length || gmResponse.updated_factions?.length) {
+      await this.ws.updateFactionsJson({
+        new_factions: gmResponse.new_factions,
+        updated_factions: gmResponse.updated_factions,
+      }, loreNow);
+    }
+    if (gmResponse.timeline_entry?.id) {
+      await this.ws.appendTimelineEntry(gmResponse.timeline_entry, loreNow);
+    }
+
+    // Update player character locations on the map
+    if (gmResponse.sender_location_node_id) {
+      await this.ws.updatePlayerLocationOnMap(from, gmResponse.sender_location_node_id);
+    }
+    if (gmResponse.recipient_location_node_id) {
+      await this.ws.updatePlayerLocationOnMap(to, gmResponse.recipient_location_node_id);
     }
 
     return {

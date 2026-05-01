@@ -63,6 +63,9 @@ export function RestoreFlow({ workerUrl, onRestored }) {
               onChange={e => setPlayerId(e.target.value)}
               placeholder="maren-voss (leave blank if you are the founder)"
             />
+            <div style={{ fontSize: 12, color: 'var(--faded)', marginTop: 5, lineHeight: 1.5 }}>
+              Your player ID is shown at the bottom of the Letters tab when you're logged in. Save it somewhere safe.
+            </div>
           </div>
           <div className="field">
             <label>Passphrase</label>
