@@ -56,6 +56,7 @@ Permissions needed:
 - **Contents:** Read and write
 - **Actions:** Write
 - **Secrets:** Write (needed to store the Copilot token in the game repo)
+- **Administration:** Write (needed to delete repositories when archiving/removing games)
 ### 2. A Copilot API Token
 This is the same GitHub token — the Copilot API uses GitHub auth. Use the same PAT.
 Once you have those, with the worker running locally, send a real `POST /game/create` from the Launcher pointing at `http://localhost:8787` — it will create an actual private GitHub repo for your game.

@@ -17,6 +17,13 @@ export function buildGameScaffold({ gameJson, engineJson, founderId, founderChar
   files['world/seed.md'] = `# World Seed\n\n*Generating...*`;
   files['world/chronicle.md'] = '';
 
+  // World lore JSON — scaffold with empty defaults so these files always exist
+  // and the PWA never gets 404s while waiting for the first GM run.
+  files['world/map.json']      = JSON.stringify({ nodes: [], edges: [], player_locations: {} }, null, 2);
+  files['world/people.json']   = JSON.stringify({ people: [] }, null, 2);
+  files['world/factions.json'] = JSON.stringify({ factions: [] }, null, 2);
+  files['world/timeline.json'] = JSON.stringify({ entries: [] }, null, 2);
+
   files[`players/${founderId}/character.md`] = `# ${founderCharacterName}\n\n${founderCharacterBio}`;
   files[`players/${founderId}/location.md`] = founderCharacterLocation || `Unknown`;
 
@@ -64,6 +71,7 @@ import { readFile } from 'fs/promises';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_PATH = path.resolve(__dirname, '..');
 const TRIGGER = process.env.TRIGGER ?? 'letter_delivery';
+const PLAYER_ID = process.env.PLAYER_ID ?? '';
 
 async function main() {
   const apiToken = process.env.COPILOT_TOKEN;
@@ -81,6 +89,19 @@ async function main() {
     apiToken, engineConfig: engineJson,
   });
   const ws = engine.worldState;
+
+  if (TRIGGER === 'player_joined') {
+    if (!PLAYER_ID) { console.warn('player_joined trigger missing PLAYER_ID — skipping.'); return; }
+    const player = gameJson.players?.find(p => p.id === PLAYER_ID);
+    if (!player) { console.warn(\`player_joined: player \${PLAYER_ID} not found in game.json — skipping.\`); return; }
+    // Canonize the new player's starting location as a world event
+    const location = await ws.readLocation(PLAYER_ID);
+    const characterName = player.character ?? PLAYER_ID;
+    const worldEvent = \`\${characterName} arrived at \${location || 'an unknown location'} and entered the world.\`;
+    await ws.appendToFile('world/events.md', \`\\n### \${new Date().toISOString().split('T')[0]}\\n\${worldEvent}\`);
+    await engine.writeStatus({ trigger: 'player_joined', lettersProcessed: 0, success: true, extraData: { playerId: PLAYER_ID } });
+    console.log('player_joined processed for', PLAYER_ID); return;
+  }
 
   if (TRIGGER === 'seed_generation') {
     const founderPlayer = gameJson.players?.find(p => p.is_founder);
@@ -157,7 +178,7 @@ main().catch(e => { console.error(e); process.exit(1); });
 `;
 }
 
-function buildWorkflow() {
+export function buildWorkflow() {
   return `name: GM Loop
 on:
   schedule:
@@ -165,8 +186,11 @@ on:
   workflow_dispatch:
     inputs:
       trigger:
-        description: 'letter_delivery | seed_generation | finalization'
+        description: 'letter_delivery | seed_generation | finalization | player_joined'
         default: 'letter_delivery'
+      player_id:
+        description: 'Player ID — required for the player_joined trigger'
+        default: ''
 
 permissions:
   contents: write
@@ -215,6 +239,7 @@ jobs:
           COPILOT_TOKEN: \${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
           TRIGGER: \${{ inputs.trigger || 'letter_delivery' }}
+          PLAYER_ID: \${{ inputs.player_id || '' }}
       - name: Commit GM changes
         if: \${{ env.SKIP_GM != 'true' }}
         run: |

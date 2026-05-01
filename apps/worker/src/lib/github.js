@@ -110,3 +110,18 @@ export async function getAuthenticatedUser(token) {
   if (!res.ok) throw new Error(`Failed to get GitHub user: ${res.status}`);
   return res.json();
 }
+export async function deleteRepository(token, owner, repo) {
+  const res = await fetch(`${GH_API}/repos/${owner}/${repo}`, {
+    method: 'DELETE',
+    headers: ghHeaders(token),
+  });
+  if (!res.ok) {
+    let errMsg = `GitHub deleteRepository failed: ${res.status}`;
+    if (res.status === 403) {
+      errMsg += ' (Permission denied — token needs delete_repo scope)';
+    }
+    const err = await res.text();
+    throw new Error(`${errMsg}: ${err}`);
+  }
+  return res.status === 204;
+}

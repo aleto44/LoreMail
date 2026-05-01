@@ -186,6 +186,52 @@ function MapTab({ worldMap, lastSeen, session, characters }) {
     }
   }
 
+  // When a real map exists but a character's location hasn't been added to
+  // player_locations yet (e.g. a new player whose join triggered a GM run that
+  // hasn't finished), synthesise a node (or match an existing one) so the
+  // character appears on the map immediately.
+  if (rawNodes.length > 0 && characters) {
+    const newLocs  = { ...playerLocations };
+    let   newNodes = [...nodes];
+    const synthMap = {};
+    let   changed  = false;
+
+    Object.entries(characters).forEach(([pid, charData]) => {
+      if (newLocs[pid]) return;                     // already tracked
+      if (!charData?.location?.trim()) return;
+
+      const label      = (charData.location.trim().split('\n').find(l => l.trim()) ?? charData.location.trim()).slice(0, 50);
+      const labelLower = label.toLowerCase();
+
+      // Try to match an existing node by label substring
+      const matchNode = newNodes.find(n => {
+        const nl = (n.label ?? '').toLowerCase();
+        return nl.length > 2 && (
+          labelLower.includes(nl.slice(0, Math.min(nl.length, 25))) ||
+          nl.includes(labelLower.slice(0, Math.min(labelLower.length, 25)))
+        );
+      });
+
+      if (matchNode) {
+        newLocs[pid] = matchNode.id;
+      } else {
+        const key = labelLower.replace(/[^a-z0-9]/g, '-');
+        if (!synthMap[key]) {
+          synthMap[key] = { id: `loc-${key}`, label, description: charData.location.trim(), _synthetic: true };
+          newNodes.push(synthMap[key]);
+        }
+        newLocs[pid] = synthMap[key].id;
+      }
+      changed = true;
+    });
+
+    if (changed) {
+      nodes             = newNodes;
+      playerLocations   = newLocs;
+      if (newNodes.length > rawNodes.length) hasSyntheticNodes = true;
+    }
+  }
+
   const positions = useForceLayout(nodes, edges);
 
   const [selected, setSelected] = useState(null);

@@ -85,6 +85,12 @@ async function fetchGameData(session) {
     } catch { return []; }
   };
 
+  // List the world directory once so we only fetch files that actually exist,
+  // avoiding noisy 404 errors in the browser console for optional world files.
+  const worldFiles = await listDir('world');
+  const worldFileSet = new Set(worldFiles.map(f => f.name));
+  const worldGet = (name) => worldFileSet.has(name) ? getContent(`world/${name}`) : Promise.resolve(null);
+
   // Fetch all in parallel
   const [
     gameJsonRaw,
@@ -105,19 +111,19 @@ async function fetchGameData(session) {
   ] = await Promise.all([
     getContent('config/game.json'),
     getContent('config/engine.json'),
-    getContent('world/canon.md'),
-    getContent('world/events.md'),
+    worldGet('canon.md'),
+    worldGet('events.md'),
     getContent('.gm-status.json'),
-    getContent('world/seed.md'),
-    isFounder ? getContent('world/chronicle.md') : Promise.resolve(null),
-    isFounder ? getContent('world/gm-notes.md') : Promise.resolve(null),
-    isFounder ? getContent('world/canon-facts.md') : Promise.resolve(null),
+    worldGet('seed.md'),
+    isFounder ? worldGet('chronicle.md') : Promise.resolve(null),
+    isFounder ? worldGet('gm-notes.md') : Promise.resolve(null),
+    isFounder ? worldGet('canon-facts.md') : Promise.resolve(null),
     listDir('letters/pending'),
     listDir('letters/delivered'),
-    getContent('world/map.json'),
-    getContent('world/people.json'),
-    getContent('world/factions.json'),
-    getContent('world/timeline.json'),
+    worldGet('map.json'),
+    worldGet('people.json'),
+    worldGet('factions.json'),
+    worldGet('timeline.json'),
   ]);
 
   const game = gameJsonRaw ? JSON.parse(gameJsonRaw) : null;

@@ -251,6 +251,50 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
     }
   }
 
+   async function deleteRepository() {
+     const confirmed = confirm(
+       `⚠️ PERMANENTLY DELETE REPOSITORY?\n\n` +
+       `"${session.repoName}" will be completely removed from GitHub.\n` +
+       `This cannot be undone!\n\n` +
+       `Click OK to confirm deletion.`
+     );
+     if (!confirmed) return;
+
+     const doubleConfirmed = confirm(
+       `🚨 Final confirmation:\n\n` +
+       `Delete "${session.repoName}" permanently?\n\n` +
+       `All game data, files, and history will be lost.`
+     );
+     if (!doubleConfirmed) return;
+
+     try {
+       const res = await fetch(
+         `https://api.github.com/repos/${session.repoOwner}/${session.repoName}`,
+         {
+           method: 'DELETE',
+           headers: {
+             Authorization: `Bearer ${session.githubToken}`,
+             Accept: 'application/vnd.github+json',
+             'X-GitHub-Api-Version': '2022-11-28',
+             'Content-Type': 'application/json',
+           },
+         },
+       );
+       if (res.ok || res.status === 204) {
+         setMsg('Repository deleted successfully.');
+       } else {
+         const d = await res.json();
+         let errMsg = d.message ?? 'unknown error';
+         if (res.status === 403) {
+           errMsg = 'Permission denied. Your GitHub token needs the "delete_repo" scope to delete repositories.';
+         }
+         setMsg('Delete failed: ' + errMsg);
+       }
+     } catch (e) {
+       setMsg('Delete failed: ' + e.message);
+     }
+   }
+
   return (
     <div>
       {/* Passphrase unlock */}
@@ -438,6 +482,14 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
           disabled={!session.githubToken}
         >
           Archive Game
+        </button>
+        <button
+          className="control-btn"
+          style={{ color: '#c0392b', marginTop: 8 }}
+          onClick={deleteRepository}
+          disabled={!session.githubToken}
+        >
+          Delete Repository
         </button>
       </div>
 
