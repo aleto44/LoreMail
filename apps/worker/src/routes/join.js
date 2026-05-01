@@ -101,7 +101,7 @@ export async function handleJoin(request, env) {
         'Content-Type': 'application/json',
         'User-Agent': 'loremail-worker/1.0',
       },
-      body: JSON.stringify({ ref: 'main', inputs: { trigger: 'letter_delivery' } }),
+      body: JSON.stringify({ ref: 'main', inputs: { trigger: 'player_joined', player_id: playerId } }),
     }
   ).catch(e => console.warn('GM trigger on join failed:', e.message));
 

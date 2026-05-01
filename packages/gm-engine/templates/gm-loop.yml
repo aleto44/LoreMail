@@ -5,8 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       trigger:
-        description: 'letter_delivery | seed_generation | finalization'
+        description: 'letter_delivery | seed_generation | finalization | player_joined'
         default: 'letter_delivery'
+      player_id:
+        description: 'Player ID — required for the player_joined trigger'
+        default: ''
 
 permissions:
   contents: write
@@ -56,6 +59,7 @@ jobs:
           COPILOT_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRIGGER: ${{ inputs.trigger || 'letter_delivery' }}
+          PLAYER_ID: ${{ inputs.player_id || '' }}
       - name: Commit GM changes
         if: ${{ env.SKIP_GM != 'true' }}
         run: |

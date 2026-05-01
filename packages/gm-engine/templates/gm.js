@@ -16,6 +16,7 @@ import { readFile } from 'fs/promises';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_PATH = path.resolve(__dirname, '..');
 const TRIGGER = process.env.TRIGGER ?? 'letter_delivery';
+const PLAYER_ID = process.env.PLAYER_ID ?? '';
 
 async function main() {
   const apiToken = process.env.COPILOT_TOKEN;
@@ -61,6 +62,15 @@ async function main() {
     await engine.generateChronicle({ game: gameJson });
     await engine.writeStatus({ trigger: 'finalization', lettersProcessed: 0, success: true });
     console.log('Chronicle generated.');
+    return;
+  }
+
+  if (TRIGGER === 'player_joined') {
+    if (!PLAYER_ID) throw new Error('PLAYER_ID environment variable is required for player_joined trigger');
+    console.log(`Processing player join for: ${PLAYER_ID}`);
+    const result = await engine.processPlayerJoin({ playerId: PLAYER_ID, game: gameJson });
+    await engine.writeStatus({ trigger: 'player_joined', lettersProcessed: 0, success: true, skipped: result.skipped ?? false });
+    console.log(`Player join processed. skipped=${result.skipped ?? false} reason=${result.reason ?? 'n/a'}`);
     return;
   }
 

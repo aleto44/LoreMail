@@ -54,6 +54,53 @@ Respond with JSON only:
     ];
   }
 
+  buildPlayerJoinPrompt({ seed, facts, playerCharacter, playerLocation, characterName, game }) {
+    const today = new Date().toISOString().split('T')[0];
+    const system = `You are the Game Master of a living epistolary world.
+Your only output is a JSON object. You never explain yourself.
+Write in third person, past tense. Measured, authoritative, unhurried.
+A new character has arrived in the world. Their starting location is player-established fact — it belongs on the world map.`;
+
+    const user = `A new character has joined the world.
+
+Character name: ${characterName}
+${playerCharacter?.trim() ? `Bio:\n${playerCharacter.trim()}` : ''}
+Starting location: ${playerLocation}
+
+${seed ? `WORLD SEED\n──────────\n${seed}` : ''}
+${facts?.trim() ? `\nESTABLISHED FACTS\n─────────────────\n${facts}` : ''}
+
+The character's starting location "${playerLocation}" is player-established fact and MUST be added to the world map as a new node, unless a node with that label already exists.
+
+If the location name implies a sub-area of a larger settlement (e.g. "Kingsland Outskirts" implies "Kingsland"), add both the sub-area AND the parent as separate nodes, with an edge connecting them.
+
+Use a stable lowercase hyphenated id derived from the location name. e.g. "brethlaham", "kingsland-outskirts".
+
+Respond ONLY with a single JSON object:
+{
+  "map_updates": {
+    "new_nodes": [{ "id": string, "label": string, "description": string }],
+    "new_edges": [{ "from": string, "to": string, "label": string, "travel_hours": integer }] | null
+  },
+  "canon_addition": string | null,
+  "world_event": string | null,
+  "gm_notes_addition": string,
+  "player_location_node_id": string
+}
+
+canon_addition: A brief [DEVELOPING] entry (60–100 words) establishing this character's presence in the world.
+  Format: ### [DEVELOPING] {title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
+  null if no canon entry is warranted.
+world_event: One past-tense sentence recording this character's arrival. Or null.
+gm_notes_addition: Your private notes on this character and how they fit the world. Always populate.
+player_location_node_id: The stable node id of the player's starting location (the node you just added, or existing).`;
+
+    return [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ];
+  }
+
   buildChroniclePrompt({ seed, facts, canon, events, characters, game }) {
     return [
       {

@@ -193,6 +193,71 @@ export class GMEngine {
     };
   }
 
+  /**
+   * Canonize a newly-joined player's starting location into the world map.
+   * Called via the `player_joined` trigger — runs even when there are no pending letters.
+   */
+  async processPlayerJoin({ playerId, game }) {
+    const [seed, facts, playerCharacter, playerLocation] = await Promise.all([
+      this.ws.readSeed(),
+      this.ws.readFacts(),
+      this.ws.readCharacter(playerId),
+      this.ws.readLocation(playerId),
+    ]);
+
+    const location = playerLocation?.trim();
+    if (!location || location === 'Unknown') {
+      return { success: true, skipped: true, reason: 'no location set' };
+    }
+
+    // Check if a node for this location already exists (by label, case-insensitive)
+    const map = await this.ws.readWorldJson('world/map.json');
+    const locationLower = location.toLowerCase();
+    const alreadyOnMap = map.nodes.some(
+      n => n.label.toLowerCase() === locationLower
+        || n.id === locationLower.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    );
+    if (alreadyOnMap) {
+      return { success: true, skipped: true, reason: 'location already on map' };
+    }
+
+    const playerEntry = game.players?.find(p => p.id === playerId);
+    const characterName = playerEntry?.character ?? playerId;
+
+    const messages = this.promptBuilder.buildPlayerJoinPrompt({
+      seed, facts, playerCharacter, playerLocation: location, characterName, game,
+    });
+
+    let gmResponse;
+    try {
+      gmResponse = await this.modelClient.chatJson(messages, { temperature: 0.5, maxTokens: 900 });
+    } catch (err) {
+      throw new Error(`GM model call failed (player_joined): ${err.message}`);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+
+    if (gmResponse.map_updates?.new_nodes?.length) {
+      await this.ws.updateMapJson(gmResponse.map_updates, now);
+    }
+    if (gmResponse.canon_addition) {
+      await this.canonManager.appendEntry(gmResponse.canon_addition);
+    }
+    if (gmResponse.world_event) {
+      const timestamp = new Date().toISOString().split('T')[0];
+      await this.ws.appendToFile('world/events.md', `\n### ${timestamp}\n${gmResponse.world_event}`);
+    }
+    if (gmResponse.gm_notes_addition) {
+      const timestamp = new Date().toISOString();
+      await this.ws.appendToFile('world/gm-notes.md', `\n<!-- ${timestamp} -->\n${gmResponse.gm_notes_addition}`);
+    }
+    if (gmResponse.player_location_node_id) {
+      await this.ws.updatePlayerLocationOnMap(playerId, gmResponse.player_location_node_id);
+    }
+
+    return { success: true, skipped: false };
+  }
+
   /** Generate the closing chronicle */
   async generateChronicle({ game }) {
     const [seed, facts, canon, events] = await Promise.all([
