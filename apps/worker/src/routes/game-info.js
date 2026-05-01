@@ -1,5 +1,12 @@
 import { json } from '../index.js';
 const GH_API = 'https://api.github.com';
+
+/** Decode a GitHub API base64 blob as UTF-8 (atob alone produces Latin-1 mojibake). */
+function decodeBase64Utf8(b64) {
+  const binary = atob(b64.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
 /**
  * GET /game/info?gameId=X&inviteToken=Y
  * Returns world name and seed excerpt for the JoinFlow splash screen.
@@ -37,12 +44,12 @@ export async function handleGameInfo(request, env) {
     ]);
     if (gameJsonRes.ok) {
       const file = await gameJsonRes.json();
-      const gameJson = JSON.parse(atob(file.content.replace(/\n/g, '')));
+      const gameJson = JSON.parse(decodeBase64Utf8(file.content));
       worldName = gameJson.name ?? gameJson.flavour ?? gameId;
     }
     if (seedRes.ok) {
       const file = await seedRes.json();
-      const seedText = atob(file.content.replace(/\n/g, ''));
+      const seedText = decodeBase64Utf8(file.content);
       // Extract first ~200 chars of actual prose (skip any markdown headings)
       const prose = seedText
         .split('\n')
@@ -78,7 +85,7 @@ async function fetchInviteLetter(game, invite, headers, GH_API) {
     const fileRes = await fetch(letterFile.url, { headers });
     if (!fileRes.ok) return null;
     const fileData = await fileRes.json();
-    const raw = atob(fileData.content.replace(/\n/g, ''));
+    const raw = decodeBase64Utf8(fileData.content);
     // Parse past second --- to get body
     const m = raw.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
     return m ? m[1].trim() : raw.trim();

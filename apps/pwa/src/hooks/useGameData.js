@@ -72,7 +72,9 @@ async function fetchGameData(session) {
   const getContent = async (path) => {
     try {
       const res = await octokit.repos.getContent({ owner, repo, path });
-      return atob(res.data.content.replace(/\n/g, ''));
+      const binary = atob(res.data.content.replace(/\n/g, ''));
+      const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
     } catch { return null; }
   };
 
