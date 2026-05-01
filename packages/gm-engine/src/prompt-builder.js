@@ -35,7 +35,9 @@ Produce:
 2. first_canon_entry — one [DEVELOPING] entry, 80–120 words.
    Format exactly: ### [DEVELOPING] {Short title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
 3. map_updates — seed the world map with the founder's starting location as the first node.
-   Use a stable lowercase hyphenated id. e.g. "crull-waystation". No edges yet.
+   Use a stable lowercase hyphenated id. e.g. "crull-waystation". No edges yet unless the
+   starting location is a sub-area of a larger settlement (e.g. "Kingsland Outskirts" → also add
+   "Kingsland" and connect them with an edge).
 
 Respond with JSON only:
 {
@@ -43,7 +45,7 @@ Respond with JSON only:
   "first_canon_entry": string,
   "map_updates": {
     "new_nodes": [{ "id": string, "label": string, "description": string }],
-    "new_edges": null
+    "new_edges": [{ "from": string, "to": string, "label": string, "travel_hours": integer }] | null
   }
 }`;
     return [
@@ -102,8 +104,14 @@ If a letter mentions "the guild leader," you may name and characterise them.
 If a letter references "the eastern road," you may establish its condition and reputation.
 If a letter hints at a conspiracy, you may record its first concrete detail.
 
-You may NOT invent named characters, institutions, or locations that have no root in player correspondence.
+You may NOT invent named characters, institutions, or locations that have no root in player correspondence
+or player-provided character data (name, bio, starting location).
 The players are the authors of what exists. You are the author of what it means.
+
+When a player's starting location (shown in the SENDER or RECIPIENT context block as "Last known location")
+is a named place not yet on the map, you MUST add it as a new map node. This is player-established fact,
+not invention. If the location name implies a parent settlement (e.g. "Kingsland Outskirts" implies
+"Kingsland"), also add the parent as a separate node and connect the two with an appropriate edge.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CANON RULES
@@ -178,6 +186,11 @@ MAP (map_updates):
   from/to: existing node ids. label: travel description e.g. "three days by road". travel_hours: integer.
 - Edges are bidirectional by default. Only add an edge when the letter implies a specific route or distance.
 - Do not add nodes for vague references ("somewhere in the east"). Only named, established places.
+- IMPORTANT: If a sender or recipient's "Last known location" (shown in the SENDER/RECIPIENT context
+  blocks) is a named place not yet in the map, you MUST add it as a new node. Player-given starting
+  locations are established facts that belong on the map. If the name implies a sub-area of a larger
+  settlement (e.g. "Kingsland Outskirts"), add both the sub-area AND the parent settlement as nodes,
+  with an edge connecting them.
 
 TIMELINE (timeline_entry):
 - One entry per delivery, only when canon_addition is non-null.
