@@ -31,6 +31,7 @@ export async function handleGameInfo(request, env) {
   let worldName = gameId;
   let seedExcerpt = null;
   let inviteLetter = null;
+  let repoFounderName = null;
   try {
     const headers = {
       Authorization: `Bearer ${game.githubToken}`,
@@ -46,6 +47,9 @@ export async function handleGameInfo(request, env) {
       const file = await gameJsonRes.json();
       const gameJson = JSON.parse(decodeBase64Utf8(file.content));
       worldName = gameJson.name ?? gameJson.flavour ?? gameId;
+      // Prefer repo game.json for founder character name — it always has the `character` field
+      const repoFounder = gameJson.players?.find(p => p.is_founder || p.id === game.founderId);
+      repoFounderName = repoFounder?.character ?? null;
     }
     if (seedRes.ok) {
       const file = await seedRes.json();
@@ -62,8 +66,9 @@ export async function handleGameInfo(request, env) {
   } catch (e) {
     console.warn('Failed to fetch world info:', e.message);
   }
-  const founderPlayer = game.players?.find(p => p.is_founder || p.id === game.founderId);
-  const founderName = founderPlayer?.character ?? null;
+  // Fall back to KV record if repo fetch failed (older games may not have character in KV)
+  const kvFounderPlayer = game.players?.find(p => p.is_founder || p.id === game.founderId);
+  const founderName = repoFounderName ?? kvFounderPlayer?.character ?? null;
   return json({ worldName, seedExcerpt, inviteeName: invite.inviteeName ?? null, inviteLetter, founderName });
 }
 

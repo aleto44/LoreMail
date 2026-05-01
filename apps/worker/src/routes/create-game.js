@@ -121,7 +121,7 @@ export async function handleCreateGame(request, env) {
     hashedPassphrase,
     githubToken: founderGithubToken,
     founderId,
-    players: [{ id: founderId, joined: true, inviteToken: null }],
+    players: [{ id: founderId, character: founderCharacterName, joined: true, inviteToken: null, is_founder: true }],
   });
 
   // Store founder session

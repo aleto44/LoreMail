@@ -1,4 +1,5 @@
 import './style.css';
+import devConfig from './dev-config.js';
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.aleto44.workers.dev';
 const PWA_URL = (import.meta.env.VITE_PWA_URL ?? 'https://loremail.app').replace(/\/$/, '');
 // ── State ──────────────────────────────────────────────
@@ -22,6 +23,69 @@ const state = {
   repoUrl: null,
   inviteLinks: [],
 };
+// ── Dev config loader ───────────────────────────────────
+// Applies dev-config.js fields to state, verifying tokens if provided.
+const CONFIG_FIELDS = [
+  'worldFlavour', 'gmStyle',
+  'founderCharacterName', 'founderCharacterBio', 'founderCharacterLocation',
+  'model', 'customGameId', 'customPassphrase',
+];
+function applySimpleConfigFields() {
+  for (const field of CONFIG_FIELDS) {
+    const val = devConfig[field];
+    if (val != null && val !== '') state[field] = val;
+  }
+}
+async function applyDevConfig() {
+  applySimpleConfigFields();
+
+  // Auto-verify GitHub token if provided
+  if (devConfig.githubToken) {
+    try {
+      const res = await fetch('https://api.github.com/user', {
+        headers: { Authorization: `Bearer ${devConfig.githubToken}`, 'User-Agent': 'loremail' },
+      });
+      if (res.ok) {
+        state.githubToken = devConfig.githubToken;
+        state.githubUser = await res.json();
+        console.info(`[dev-config] GitHub token verified as @${state.githubUser.login}`);
+      } else {
+        console.warn(`[dev-config] GitHub token rejected (HTTP ${res.status}) — step 2 will show the input form`);
+      }
+    } catch (e) {
+      console.warn('[dev-config] GitHub token check failed:', e.message);
+    }
+  }
+
+  // Auto-verify model token if provided
+  if (devConfig.modelToken) {
+    try {
+      const res = await fetch(`${WORKER_URL}/models/list`, {
+        headers: { Authorization: `Bearer ${devConfig.modelToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const ids = data.models ?? [];
+        if (ids.length > 0) {
+          state.modelToken = devConfig.modelToken;
+          state.availableModels = ids;
+          state.modelsVerified = true;
+          // Use configured model if available, else fall back to first
+          if (devConfig.model && ids.includes(devConfig.model)) {
+            state.model = devConfig.model;
+          } else {
+            state.model = ids[0];
+          }
+          console.info(`[dev-config] Model token verified — ${ids.length} models available, selected: ${state.model}`);
+        }
+      } else {
+        console.warn(`[dev-config] Model token rejected (HTTP ${res.status}) — step 3 will show the input form`);
+      }
+    } catch (e) {
+      console.warn('[dev-config] Model token check failed:', e.message);
+    }
+  }
+}
 // Steps that allow going back
 const BACK_ALLOWED = [2, 3, 4, 5];
 // Steps that allow going forward manually (have their own next btn logic elsewhere)
@@ -764,4 +828,7 @@ function showError(container, msg) {
   err.textContent = msg;
 }
 // ── Init ───────────────────────────────────────────────
-render();
+(async () => {
+  await applyDevConfig();
+  render();
+})();
