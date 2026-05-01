@@ -26,6 +26,7 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
 
       {inbox.length > 0 && (
         <>
+          <div className="section-title">Received</div>
           {inbox.map(letter => (
             <div
               key={letter.id}
@@ -34,7 +35,7 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
             >
               <div className="letter-dot" />
               <div className="letter-row-meta">
-                <div className="letter-row-from">{formatSenderName(letter.from, data)}</div>
+                <div className="letter-row-from">from {formatSenderName(letter.from, data)}</div>
                 <div className="letter-row-preview">{letter.body.split('\n')[0]?.slice(0, 60)}…</div>
                 <div className="letter-row-time">{letter.arrivedLabel}</div>
               </div>
@@ -67,7 +68,7 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
               onClick={() => onReadLetter(letter)}
             >
               <div className="letter-row-meta">
-                <div className="letter-row-from">→ {formatRecipientName(letter.to, data)}</div>
+                <div className="letter-row-from">to {formatRecipientName(letter.to, data)}</div>
                 <div className="letter-row-preview">{letter.body.split('\n')[0]?.slice(0, 60)}…</div>
                 <div className="letter-row-time">{letter.arrivedLabel}</div>
               </div>

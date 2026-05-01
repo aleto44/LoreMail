@@ -54,7 +54,14 @@ export function ComposeScreen({ session, data, onSent, onCancel }) {
         }
       ).catch(e => console.warn('GM trigger failed:', e.message));
 
-      onSent();
+      // Pass back the optimistic pending-letter so the UI can show it instantly
+      onSent({
+        id: filename,
+        from: session.playerId,
+        to,
+        deliverAt,
+        hoursRemaining: Math.max(0, Math.ceil((deliverAt - Date.now() / 1000) / 3600)),
+      });
     } catch (e) {
       console.error(e);
       setError(e.message ?? 'Failed to send');

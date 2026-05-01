@@ -330,6 +330,16 @@ textarea { resize: vertical; min-height: 120px; }
   white-space: pre-wrap;
 }
 
+.letter-meta-header {
+  font-size: 13px;
+  color: var(--faded);
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: normal;
+}
+
 .letter-signature {
   text-align: right;
   margin-top: 24px;

@@ -1,6 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Octokit } from '@octokit/rest';
-import matter from 'gray-matter';
+
+/**
+ * Minimal YAML front-matter parser — browser-safe replacement for gray-matter.
+ * Handles the simple key: value format used by LoreMail letters.
+ */
+function parseMatter(raw) {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { data: {}, content: raw };
+  const data = {};
+  for (const line of match[1].split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    const val = line.slice(colonIdx + 1).trim();
+    if (val === 'true') data[key] = true;
+    else if (val === 'false') data[key] = false;
+    else if (/^\d+$/.test(val)) data[key] = parseInt(val, 10);
+    else data[key] = val;
+  }
+  return { data, content: match[2] };
+}
 
 /**
  * useGameData — fetches all game data from the GitHub repo.
@@ -25,11 +45,24 @@ export function useGameData(session) {
     }
   }, [session]);
 
+  /**
+   * Optimistically patch the in-memory data without a network round-trip.
+   * patchFn receives the current data object and should return the updated one.
+   */
+  const patchData = useCallback((patchFn) => {
+    setData(prev => {
+      if (!prev) return prev;
+      const next = patchFn(prev);
+      cacheRef.current = next;
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (session) refresh();
   }, [session, refresh]);
 
-  return { data, loading, refresh };
+  return { data, loading, refresh, patchData };
 }
 
 async function fetchGameData(session) {
@@ -90,7 +123,7 @@ async function fetchGameData(session) {
     if (from === playerId || to === playerId) {
       const raw = await getContent(`letters/delivered/${file.name}`);
       if (!raw) continue;
-      const parsed = matter(raw);
+      const parsed = parseMatter(raw);
       if (parsed.data.to === playerId || parsed.data.from === playerId) {
         myDelivered.push({
           id: file.name,

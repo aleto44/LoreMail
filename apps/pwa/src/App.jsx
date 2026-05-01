@@ -19,6 +19,9 @@ export default function App() {
   const [readingLetter, setReadingLetter] = useState(null);
   const [showChronicle, setShowChronicle] = useState(false);
 
+  // Remaining post-join refresh attempts (counts down to 0)
+  const [joinPollsLeft, setJoinPollsLeft] = useState(0);
+
   // Check for join flow params
   const params = new URLSearchParams(window.location.search);
   const joinGameId = params.get('game');
@@ -29,7 +32,7 @@ export default function App() {
     setSession(sess);
   }, []);
 
-  const { data, loading, refresh } = useGameData(session);
+  const { data, loading, refresh, patchData } = useGameData(session);
 
   // Poll on focus
   useEffect(() => {
@@ -37,6 +40,23 @@ export default function App() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [refresh]);
+
+  // ── Post-join smart polling ───────────────────────────────
+  // After a player joins, retry every 3 s until their first letter appears
+  // (the worker / GitHub CI can take a few seconds to commit it).
+  useEffect(() => {
+    if (joinPollsLeft <= 0) return;
+    // Stop early if data already has letters
+    if (data?.deliveredLetters?.length > 0 || data?.pendingLetters?.length > 0) {
+      setJoinPollsLeft(0);
+      return;
+    }
+    const id = setTimeout(async () => {
+      await refresh();
+      setJoinPollsLeft(n => Math.max(0, n - 1));
+    }, 3000);
+    return () => clearTimeout(id);
+  }, [joinPollsLeft, data, refresh]);
 
   // ── Auth states ──────────────────────────────────────────
   // Always show JoinFlow for invite links — even if the user has an existing
@@ -47,7 +67,12 @@ export default function App() {
         gameId={joinGameId}
         inviteToken={inviteToken}
         workerUrl={WORKER_URL}
-        onJoined={saveSession}
+        onJoined={(sess) => {
+          saveSession(sess);
+          // Start polling so the welcome letter appears as soon as the
+          // worker/CI finishes committing it (up to 8 retries × 3 s = 24 s).
+          setJoinPollsLeft(8);
+        }}
       />
     );
   }
@@ -68,7 +93,22 @@ export default function App() {
       <ComposeScreen
         session={session}
         data={data}
-        onSent={() => { setComposing(false); refresh(); }}
+        onSent={(newLetter) => {
+          // Optimistically inject the sent letter into the pending list so
+          // "In Transit" appears instantly without any network round-trip.
+          if (newLetter) {
+            patchData(d => ({
+              ...d,
+              pendingLetters: [...(d?.pendingLetters ?? []), newLetter],
+            }));
+          }
+          setComposing(false);
+          // Do NOT call refresh() here — GitHub's API can lag a few hundred ms
+          // after a successful commit, so an immediate read would race and
+          // overwrite the optimistic state with stale data.
+          // The focus-event listener in useEffect will sync when the user next
+          // switches away and back, by which point GitHub is fully consistent.
+        }}
         onCancel={() => setComposing(false)}
       />
     );
@@ -76,14 +116,22 @@ export default function App() {
 
   // ── Letter reading ────────────────────────────────────────
   if (readingLetter) {
+    const senderName =
+      data?.characters?.[readingLetter.from]?.name ?? readingLetter.from;
+    const isSent = readingLetter.from === session.playerId;
     return (
       <div className="app-shell">
         <div className="screen-content">
           <div className="letter-view">
             <button className="letter-back" onClick={() => setReadingLetter(null)}>←</button>
             <div className="letter-paper">
+              {isSent && (
+                <div className="letter-meta-header">
+                  to {data?.characters?.[readingLetter.to]?.name ?? readingLetter.to}
+                </div>
+              )}
               <div>{readingLetter.body}</div>
-              <div className="letter-signature">{readingLetter.from}</div>
+              <div className="letter-signature">{senderName}</div>
             </div>
             <div className="letter-arrived">{readingLetter.arrivedLabel}</div>
           </div>
