@@ -31,6 +31,20 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
   // Strip the "# World Seed" h1 from seed for display (it's shown by the section heading)
   const seedBody = seed.replace(/^#\s+World Seed\s*/i, '').trim();
 
+  /**
+   * Strip internal GM metadata that players should not see.
+   * Specifically removes "source: gm-inference" (and whitespace/punctuation before it)
+   * from canon entry headers. Founders see the full content.
+   */
+  function stripPlayerMetadata(text) {
+    if (!text) return text;
+    return text.replace(/\s+source:\s*gm-inference/gi, '');
+  }
+
+  const displaySeedBody = stripPlayerMetadata(seedBody);
+  const displayRecentHistory = stripPlayerMetadata(recentHistory);
+  const displayEventLines = stripPlayerMetadata(eventLines);
+
   async function handleRetriggerSeed() {
     setRetriggerState('loading');
     try {
@@ -69,12 +83,6 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
 
       {worldTab === 'world' && (
         <div className="world-content">
-          {game?.name && (
-            <div style={{ fontFamily: "'IM Fell English', serif", fontSize: 18, marginBottom: 16 }}>
-              {game.name}
-            </div>
-          )}
-
           {/* World Seed */}
           {seedGenerating ? (
             <div className="seed-generating">
@@ -100,19 +108,19 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
             <div className="world-seed">
               <div className="world-seed-label">World Seed</div>
               <div className="world-prose">
-                <ReactMarkdown>{seedBody}</ReactMarkdown>
+                <ReactMarkdown>{displaySeedBody}</ReactMarkdown>
               </div>
             </div>
           ) : null}
 
           <div className="world-prose" style={{ marginTop: seedBody && !seedGenerating ? 20 : 0 }}>
-            <ReactMarkdown>{recentHistory || '*The world is quiet. No history has been recorded yet.*'}</ReactMarkdown>
+            <ReactMarkdown>{displayRecentHistory || '*The world is quiet. No history has been recorded yet.*'}</ReactMarkdown>
           </div>
 
           {eventLines && (
             <div className="world-events">
               <div className="world-events-title">Recent Events</div>
-              {eventLines.split(/\n### /).filter(Boolean).map((e, i) => (
+              {displayEventLines.split(/\n### /).filter(Boolean).map((e, i) => (
                 <div key={i} className="event-item">
                   <ReactMarkdown>{e.trim()}</ReactMarkdown>
                 </div>

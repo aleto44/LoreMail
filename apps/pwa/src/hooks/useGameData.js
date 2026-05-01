@@ -116,6 +116,15 @@ async function fetchGameData(session) {
   const engine = engineJsonRaw ? JSON.parse(engineJsonRaw) : null;
   const gmStatus = statusRaw ? JSON.parse(statusRaw) : null;
 
+  // Strip the founder's seed-prompt inputs from the game objects
+  // These fields (flavour, era, tone) are internal world-setup details that players
+  // should not see — only the AI-generated seed.md prose is shown to them.
+  if (game) {
+    delete game.flavour;
+    delete game.era;
+    delete game.tone;
+  }
+
   // Parse delivered letters
   const myDelivered = [];
   for (const file of deliveredFiles) {
