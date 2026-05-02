@@ -26,7 +26,7 @@ export async function handlePushSelfTest(request, env) {
   // Look up their push subscription
   const subRaw = await env.KV.get(`push:sub:${gameId}:${playerId}`);
   if (!subRaw) {
-    return json({ error: 'No push subscription registered for this player' }, 404);
+    return json({ ok: false, error: 'No push subscription registered — please reopen the app to re-enroll.' }, 410);
   }
 
   const subscription = JSON.parse(subRaw);

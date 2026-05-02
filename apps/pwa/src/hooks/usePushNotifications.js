@@ -14,13 +14,16 @@ function urlBase64ToUint8Array(base64url) {
  * Returns { pushStatus, pushError, retrySubscribe, sendTestNotification }
  *
  * pushStatus: 'idle' | 'subscribed' | 'denied' | 'unsupported' | 'error'
+ *
+ * retrySubscribe: force-unsubscribes any stale browser subscription first,
+ * then creates a fresh one and re-registers with the Worker.
  */
 export function usePushNotifications(session) {
   const subscribedRef = useRef(false);
   const [pushStatus, setPushStatus] = useState('idle');
   const [pushError, setPushError] = useState(null);
-  const subscribe = useCallback(async () => {
-    if (subscribedRef.current) return;
+  const subscribe = useCallback(async (forceRefresh = false) => {
+    if (subscribedRef.current && !forceRefresh) return;
     if (!session?.gameId || !session?.playerId) {
       console.log('[Push] No session yet, skipping');
       return;
@@ -36,7 +39,7 @@ export function usePushNotifications(session) {
       return;
     }
     if (Notification.permission === 'denied') {
-      console.warn('[Push] Notification permission is denied');
+      console.warn('[Push] Permission denied');
       setPushStatus('denied');
       return;
     }
@@ -62,7 +65,12 @@ export function usePushNotifications(session) {
         return;
       }
       let subscription = await registration.pushManager.getSubscription();
-      console.log('[Push] Existing subscription:', subscription ? subscription.endpoint.slice(0, 60) + '...' : 'none');
+      // Force-refresh: unsubscribe the old (potentially dead) subscription first
+      if (forceRefresh && subscription) {
+        console.log('[Push] Force-refresh: unsubscribing old subscription...');
+        await subscription.unsubscribe();
+        subscription = null;
+      }
       if (!subscription) {
         console.log('[Push] Requesting permission...');
         const permission = await Notification.requestPermission();
@@ -71,12 +79,14 @@ export function usePushNotifications(session) {
           setPushStatus('denied');
           return;
         }
-        console.log('[Push] Subscribing...');
+        console.log('[Push] Creating new subscription...');
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
-        console.log('[Push] Subscribed');
+        console.log('[Push] Subscribed to push service');
+      } else {
+        console.log('[Push] Reusing existing browser subscription');
       }
       if (!subscription) {
         const msg = 'pushManager.subscribe returned null';
@@ -106,18 +116,26 @@ export function usePushNotifications(session) {
       subscribedRef.current = true;
       setPushStatus('subscribed');
       setPushError(null);
-      console.log('[Push] All done - push notifications active');
+      console.log('[Push] Push notifications active');
     } catch (e) {
       console.warn('[Push] Failed:', e.message, e);
       setPushStatus('error');
       setPushError(e.message);
     }
   }, [session]);
+  // Soft retry — keeps existing browser subscription but re-registers with Worker
   const retrySubscribe = useCallback(() => {
     subscribedRef.current = false;
     setPushStatus('idle');
     setPushError(null);
-    subscribe();
+    subscribe(false);
+  }, [subscribe]);
+  // Hard retry — unsubscribes existing browser subscription and creates a brand new one
+  const forceResubscribe = useCallback(() => {
+    subscribedRef.current = false;
+    setPushStatus('idle');
+    setPushError(null);
+    subscribe(true);
   }, [subscribe]);
   const sendTestNotification = useCallback(async () => {
     if (!session?.gameId || !session?.playerId) return { ok: false, error: 'No session' };
@@ -129,15 +147,20 @@ export function usePushNotifications(session) {
       });
       const data = await res.json();
       console.log('[Push] Self-test result:', data);
+      // If subscription expired, auto-trigger a hard re-subscribe
+      if (res.status === 410 || data.error?.includes('expired')) {
+        console.warn('[Push] Subscription expired — forcing fresh subscription...');
+        setTimeout(() => forceResubscribe(), 500);
+      }
       return data;
     } catch (e) {
       console.warn('[Push] Self-test failed:', e.message);
       return { ok: false, error: e.message };
     }
-  }, [session]);
+  }, [session, forceResubscribe]);
   useEffect(() => {
-    const id = setTimeout(subscribe, 2000);
+    const id = setTimeout(() => subscribe(false), 2000);
     return () => clearTimeout(id);
   }, [subscribe]);
-  return { pushStatus, pushError, retrySubscribe, sendTestNotification };
+  return { pushStatus, pushError, retrySubscribe, forceResubscribe, sendTestNotification };
 }

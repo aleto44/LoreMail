@@ -109,21 +109,24 @@ export default function App() {
   }, [tab, markLettersSeen]);
 
   // Register push notifications once the player has a session
-  const { pushStatus, pushError, retrySubscribe, sendTestNotification } = usePushNotifications(session);
+  const { pushStatus, pushError, retrySubscribe, forceResubscribe, sendTestNotification } = usePushNotifications(session);
   const [testNotifResult, setTestNotifResult] = useState(null);
 
   const handleTestNotification = useCallback(async () => {
     setTestNotifResult('sending…');
     const result = await sendTestNotification();
     if (result.ok) {
-      const endpointHint = result.endpoint
-        ? ` (${result.endpoint})`
-        : '';
+      const endpointHint = result.endpoint ? ` (${result.endpoint})` : '';
       setTestNotifResult(`✓ sent${endpointHint} — check phone`);
+      setTimeout(() => setTestNotifResult(null), 8000);
+    } else if (result.error?.includes('expired') || result.error?.includes('No push subscription')) {
+      // Subscription is stale — forceResubscribe was already triggered in the hook
+      setTestNotifResult('↻ re-enrolling…');
+      setTimeout(() => setTestNotifResult(null), 4000);
     } else {
       setTestNotifResult(`✗ ${result.error}`);
+      setTimeout(() => setTestNotifResult(null), 8000);
     }
-    setTimeout(() => setTestNotifResult(null), 8000);
   }, [sendTestNotification]);
 
    // Poll on focus
