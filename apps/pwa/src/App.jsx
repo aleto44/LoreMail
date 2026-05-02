@@ -24,31 +24,41 @@ export default function App() {
   const [showExitToast, setShowExitToast] = useState(false);
   const exitToastRef = useRef(null);
 
+  // Navigate to a tab and push a history entry so back button works
+  const handleSetTab = useCallback((newTab) => {
+    setTab(newTab);
+    window.history.pushState({ view: 'tab', tab: newTab }, '');
+  }, []);
+
   // Handle Android back button
   useEffect(() => {
-    // Replace the page-load entry with a known state, then push a guard
-    // entry so Android back has to pop through our stack before exiting.
-    window.history.replaceState({ view: 'main' }, '');
-    window.history.pushState({ view: 'main' }, '');
+    // Tag the page-load entry with our initial state, then push a guard
+    // so the first back press doesn't immediately exit the app.
+    window.history.replaceState({ view: 'tab', tab: 'letters' }, '');
+    window.history.pushState({ view: 'tab', tab: 'letters' }, '');
 
     const handlePopState = (e) => {
       const state = e.state;
 
       if (!state || !state.view) {
-        // Fallen below our history — show "press again to exit" toast
-        window.history.pushState({ view: 'main' }, '');
+        // Below our history floor — prevent exit, show toast
+        window.history.pushState({ view: 'tab', tab: 'letters' }, '');
+        setTab('letters');
         setComposing(false);
         setReadingLetter(null);
         setShowChronicle(false);
-        // Show exit toast
         setShowExitToast(true);
         clearTimeout(exitToastRef.current);
         exitToastRef.current = setTimeout(() => setShowExitToast(false), 2000);
         return;
       }
 
-      // Close whatever overlay matches the state we're returning to
-      if (state.view === 'reading') {
+      if (state.view === 'tab') {
+        setTab(state.tab ?? 'letters');
+        setComposing(false);
+        setReadingLetter(null);
+        setShowChronicle(false);
+      } else if (state.view === 'reading') {
         setReadingLetter(state.letter || null);
         setComposing(false);
         setShowChronicle(false);
@@ -61,7 +71,6 @@ export default function App() {
         setReadingLetter(null);
         setShowChronicle(false);
       } else {
-        // 'main' — close all overlays
         setComposing(false);
         setReadingLetter(null);
         setShowChronicle(false);
@@ -261,10 +270,10 @@ export default function App() {
   return (
     <div className="app-shell">
       <nav className="tab-bar">
-        <button className={tab === 'world' ? 'active' : ''} onClick={() => setTab('world')}>The World</button>
-        <button className={tab === 'letters' ? 'active' : ''} onClick={() => setTab('letters')}>Letters</button>
+        <button className={tab === 'world' ? 'active' : ''} onClick={() => handleSetTab('world')}>The World</button>
+        <button className={tab === 'letters' ? 'active' : ''} onClick={() => handleSetTab('letters')}>Letters</button>
         {session.isFounder && (
-          <button className={tab === 'control' ? 'active' : ''} onClick={() => setTab('control')}>⚙ Control</button>
+          <button className={tab === 'control' ? 'active' : ''} onClick={() => handleSetTab('control')}>⚙ Control</button>
         )}
       </nav>
 
