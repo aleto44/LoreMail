@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+# Runs on every push to main that touches either app.
+# You can also trigger it manually from the GitHub Actions tab.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/pwa/**'
+      - 'apps/launcher/**'
+      - 'packages/**'
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed by peaceiris/actions-gh-pages to push to gh-pages branch
+
+    steps:
+      # 1. Check out the full repo
+      - uses: actions/checkout@v4
+
+      # 2. Set up Node 20 (matches the local dev environment)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 3. Install all workspace dependencies in one shot
+      #    (npm workspaces means a single `npm ci` at the root installs everything)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build the PWA
+      #    VITE_WORKER_URL comes from apps/pwa/.env.production (already committed).
+      #    base is set to /LoreMail/ in vite.config.js.
+      - name: Build PWA
+        run: npm run build --workspace=apps/pwa
+
+      # 5. Build the Launcher
+      #    VITE_WORKER_URL + VITE_PWA_URL come from apps/launcher/.env.production.
+      #    base is set to /LoreMail/launch/ in vite.config.js.
+      - name: Build Launcher
+        run: npm run build --workspace=apps/launcher
+
+      # 6. Merge both dist folders into a single output tree:
+      #      gh-pages root  →  apps/pwa/dist        (serves at /LoreMail/)
+      #      gh-pages/launch →  apps/launcher/dist   (serves at /LoreMail/launch/)
+      - name: Merge build outputs
+        run: |
+          mkdir -p deploy
+          cp -r apps/pwa/dist/. deploy/
+          mkdir -p deploy/launch
+          cp -r apps/launcher/dist/. deploy/launch/
+
+      # 7. Push the merged folder to the gh-pages branch.
+      #    GitHub Pages serves this branch automatically (configure in repo Settings → Pages).
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: deploy
+          # Keeps the CNAME file if you ever add a custom domain
+          keep_files: false

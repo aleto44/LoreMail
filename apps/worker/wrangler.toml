@@ -2,13 +2,21 @@ name = "loremail-worker"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = false
 [[kv_namespaces]]
 binding = "KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "a3907b098fe04b7bad614831b6138338"
+preview_id = "67aed69072ed41b3b9f9807de578b699"
 [dev]
 port = 8787
 local_protocol = "http"
+# ── Production vars — used by `wrangler deploy` (no --env flag) ───────────────
 [vars]
+ENVIRONMENT = "production"
+PWA_URL = "https://aleto44.github.io/LoreMail"
+
+# ── Local development vars — used by `wrangler dev` ───────────────────────────
+[env.development.vars]
 ENVIRONMENT = "development"
 PWA_URL = "http://localhost:5173"

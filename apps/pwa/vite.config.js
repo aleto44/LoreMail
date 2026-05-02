@@ -16,14 +16,14 @@ export default defineConfig({
         background_color: '#f5f0e8',
         display: 'standalone',
         icons: [
-          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: '/LoreMail/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
         ],
         screenshots: [],
         shortcuts: [],
       },
     }),
   ],
-  base: '/',
+  base: '/LoreMail/',
   server: { port: 5173, strictPort: true },
   build: { outDir: 'dist' },
 });

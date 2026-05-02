@@ -18,39 +18,48 @@ import { corsHeaders, handleCors } from './lib/cors.js';
 
 export default {
   async fetch(request, env) {
+    // Handle CORS preflight — must respond before any route logic
     if (request.method === 'OPTIONS') {
-      return handleCors();
+      return handleCors(request, env);
     }
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
 
+    let response;
     try {
-      if (method === 'POST' && path === '/game/create') return handleCreateGame(request, env);
-      if (method === 'POST' && path === '/game/invite') return handleInvite(request, env);
-      if (method === 'POST' && path === '/game/join') return handleJoin(request, env);
-      if (method === 'GET' && path === '/game/player') return handleGetPlayer(request, env);
-      if (method === 'PATCH' && path === '/game/config') return handlePatchConfig(request, env);
-      if (method === 'POST' && path === '/game/regenerate-invite') return handleRegenerateInvite(request, env);
-      if (method === 'DELETE' && path === '/game/player') return handleDeletePlayer(request, env);
-      if (method === 'GET' && path === '/game/info') return handleGameInfo(request, env);
-      if (method === 'GET' && path === '/models/list') return handleListModels(request, env);
-      if (method === 'POST' && path === '/models/probe') return handleProbeModel(request, env);
-      if (method === 'POST' && path === '/game/trigger-seed') return handleTriggerSeed(request, env);
-      if (method === 'DELETE' && path === '/game/repo') return handleDeleteRepo(request, env);
-
-      return json({ error: 'Not found' }, 404);
+      if (method === 'POST' && path === '/game/create') response = await handleCreateGame(request, env);
+      else if (method === 'POST' && path === '/game/invite') response = await handleInvite(request, env);
+      else if (method === 'POST' && path === '/game/join') response = await handleJoin(request, env);
+      else if (method === 'GET' && path === '/game/player') response = await handleGetPlayer(request, env);
+      else if (method === 'PATCH' && path === '/game/config') response = await handlePatchConfig(request, env);
+      else if (method === 'POST' && path === '/game/regenerate-invite') response = await handleRegenerateInvite(request, env);
+      else if (method === 'DELETE' && path === '/game/player') response = await handleDeletePlayer(request, env);
+      else if (method === 'GET' && path === '/game/info') response = await handleGameInfo(request, env);
+      else if (method === 'GET' && path === '/models/list') response = await handleListModels(request, env);
+      else if (method === 'POST' && path === '/models/probe') response = await handleProbeModel(request, env);
+      else if (method === 'POST' && path === '/game/trigger-seed') response = await handleTriggerSeed(request, env);
+      else if (method === 'DELETE' && path === '/game/repo') response = await handleDeleteRepo(request, env);
+      else response = json({ error: 'Not found' }, 404);
     } catch (err) {
       console.error('Worker error:', err);
-      return json({ error: err.message ?? 'Internal server error' }, 500);
+      response = json({ error: err.message ?? 'Internal server error' }, 500);
     }
+
+    // Attach the correct CORS headers to every response (based on the actual request origin)
+    const origin = request.headers.get('Origin') ?? '';
+    const cors = corsHeaders(origin, env);
+    const out = new Response(response.body, response);
+    for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
+    return out;
   },
 };
 
+// Plain JSON response — no CORS headers here; they are added at the top level above.
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
