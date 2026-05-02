@@ -253,11 +253,10 @@ textarea { resize: vertical; min-height: 120px; }
 
 .letter-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-  cursor: pointer;
   transition: background 0.1s;
 }
 
@@ -277,7 +276,55 @@ textarea { resize: vertical; min-height: 120px; }
 .letter-row-meta { flex: 1; min-width: 0; }
 .letter-row-from { font-weight: 500; font-size: 14px; }
 .letter-row-preview { font-size: 13px; color: var(--faded); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.letter-row-time { font-size: 11px; color: var(--faded); margin-top: 2px; }
+.letter-row-time { font-size: 11px; color: var(--faded); margin-top: 2px; flex-shrink: 0; }
+
+/* ── Letter preview component ── */
+.letter-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.letter-preview-envelope {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.2s;
+}
+
+.letter-preview-envelope:hover {
+  filter: drop-shadow(0 2px 8px rgba(122, 59, 30, 0.3));
+}
+
+.letter-preview-envelope.is-opening {
+  pointer-events: none;
+}
+
+.letter-preview-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.letter-preview-from {
+  font-weight: 500;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.letter-preview-label {
+  font-size: 12px;
+  color: var(--faded);
+  font-style: italic;
+}
 
 .in-transit-row {
   padding: 14px 16px;
@@ -440,9 +487,11 @@ textarea { resize: vertical; min-height: 120px; }
 .lore-badge--updated { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
 
 .lore-card-name {
-  font-weight: 500;
-  font-size: 15px;
-  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: var(--ink);
+  letter-spacing: 0.02em;
 }
 
 .lore-card-body {

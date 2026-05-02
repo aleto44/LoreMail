@@ -94,13 +94,9 @@ async function main() {
     if (!PLAYER_ID) { console.warn('player_joined trigger missing PLAYER_ID — skipping.'); return; }
     const player = gameJson.players?.find(p => p.id === PLAYER_ID);
     if (!player) { console.warn(\`player_joined: player \${PLAYER_ID} not found in game.json — skipping.\`); return; }
-    // Canonize the new player's starting location as a world event
-    const location = await ws.readLocation(PLAYER_ID);
-    const characterName = player.character ?? PLAYER_ID;
-    const worldEvent = \`\${characterName} arrived at \${location || 'an unknown location'} and entered the world.\`;
-    await ws.appendToFile('world/events.md', \`\\n### \${new Date().toISOString().split('T')[0]}\\n\${worldEvent}\`);
-    await engine.writeStatus({ trigger: 'player_joined', lettersProcessed: 0, success: true, extraData: { playerId: PLAYER_ID } });
-    console.log('player_joined processed for', PLAYER_ID); return;
+    const result = await engine.processPlayerJoin({ playerId: PLAYER_ID, game: gameJson });
+    await engine.writeStatus({ trigger: 'player_joined', lettersProcessed: 0, success: true, skipped: result.skipped ?? false, extraData: { playerId: PLAYER_ID, reason: result.reason } });
+    console.log(\`Player join processed. skipped=\${result.skipped ?? false} reason=\${result.reason ?? 'n/a'}\`); return;
   }
 
   if (TRIGGER === 'seed_generation') {

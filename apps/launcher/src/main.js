@@ -13,6 +13,7 @@ const state = {
   founderCharacterName: '',
   founderCharacterBio: '',
   founderCharacterLocation: '',
+  founderCharacterGender: '',
   model: 'gpt-4o',
   availableModels: [],
   modelsVerified: false,
@@ -27,7 +28,7 @@ const state = {
 // Applies dev-config.js fields to state, verifying tokens if provided.
 const CONFIG_FIELDS = [
   'worldFlavour', 'gmStyle',
-  'founderCharacterName', 'founderCharacterBio', 'founderCharacterLocation',
+  'founderCharacterName', 'founderCharacterBio', 'founderCharacterLocation', 'founderCharacterGender',
   'model', 'customGameId', 'customPassphrase',
 ];
 function applySimpleConfigFields() {
@@ -485,12 +486,17 @@ function step4() {
       <label>Where are you in the world right now?</label>
       <textarea id="char-location" rows="2" placeholder="Somewhere on the road between two cities I'd rather not name.">${state.founderCharacterLocation}</textarea>
     </div>
+    <div class="field">
+      <label>Gender (optional)</label>
+      <input type="text" id="char-gender" value="${state.founderCharacterGender}" placeholder="e.g. woman, man, non-binary" />
+    </div>
     <button class="btn-primary" id="step4-next">Continue →</button>
   `);
   addNavRow(card, { backStep: 3 });
   card.querySelector('#char-name').addEventListener('input', e => { state.founderCharacterName = e.target.value; });
   card.querySelector('#char-bio').addEventListener('input', e => { state.founderCharacterBio = e.target.value; });
   card.querySelector('#char-location').addEventListener('input', e => { state.founderCharacterLocation = e.target.value; });
+  card.querySelector('#char-gender').addEventListener('input', e => { state.founderCharacterGender = e.target.value; });
   card.querySelector('#step4-next').addEventListener('click', () => {
     if (!state.founderCharacterName || !state.founderCharacterBio || !state.founderCharacterLocation) {
       showError(card, 'Please fill in all three fields.'); return;
@@ -637,6 +643,7 @@ async function createGame() {
         founderCharacterName: state.founderCharacterName,
         founderCharacterBio: state.founderCharacterBio,
         founderCharacterLocation: state.founderCharacterLocation,
+        founderCharacterGender: state.founderCharacterGender,
         gameId: state.customGameId,
         passphrase: state.customPassphrase,
       }),

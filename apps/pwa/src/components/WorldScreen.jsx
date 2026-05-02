@@ -128,7 +128,7 @@ function TimelineTab({ worldTimeline, lastSeen }) {
 // ── Tab: People ───────────────────────────────────────────────────────────────
 
 function PeopleTab({ worldPeople, lastSeen }) {
-  const people = worldPeople?.people ?? [];
+  const people = [...(worldPeople?.people ?? [])].sort((a, b) => (b.last_updated ?? b.first_mentioned ?? 0) - (a.last_updated ?? a.first_mentioned ?? 0));
   if (!people.length) return <div className="empty-state">No people have been recorded yet.</div>;
 
   return (
@@ -136,11 +136,13 @@ function PeopleTab({ worldPeople, lastSeen }) {
       {people.map(person => {
         const isNew     = person.first_mentioned > lastSeen;
         const isUpdated = !isNew && person.last_updated > lastSeen;
+        // Use the person's ID as their name (capitalized)
+        const displayName = person.id.charAt(0).toUpperCase() + person.id.slice(1);
         return (
           <div key={person.id} className="lore-card">
             {isNew     && <Badge type="new" />}
             {isUpdated && <Badge type="updated" />}
-            <div className="lore-card-name">{person.name}</div>
+            <div className="lore-card-name">{displayName}</div>
             <div className="lore-card-body">{person.description}</div>
             {person.status && <div className="lore-card-status">status: {person.status}</div>}
           </div>
@@ -358,7 +360,7 @@ function MapTab({ worldMap, lastSeen, session, characters }) {
 // ── Tab: Factions ─────────────────────────────────────────────────────────────
 
 function FactionsTab({ worldFactions, lastSeen }) {
-  const factions = worldFactions?.factions ?? [];
+  const factions = [...(worldFactions?.factions ?? [])].sort((a, b) => (b.last_updated ?? b.first_mentioned ?? 0) - (a.last_updated ?? a.first_mentioned ?? 0));
   if (!factions.length) return <div className="empty-state">No factions have been recorded yet.</div>;
 
   return (
@@ -419,7 +421,7 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
   const seedGenerating = data?.seedGenerating ?? false;
 
   const recentMatch   = canon.match(/## RECENT HISTORY[\s\S]*?\n\n([\s\S]*)$/);
-  const recentHistory = recentMatch ? recentMatch[1].trim() : '';
+  const recentHistory = recentMatch ? recentMatch[1].trim().split('\n\n').reverse().join('\n\n') : '';
   const eventLines    = events.split('\n').filter(l => l && !l.startsWith('# ')).join('\n').trim();
   const seedBody      = seed.replace(/^#\s+World Seed\s*/i, '').trim();
 
@@ -497,23 +499,25 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
                 </div>
               )}
             </div>
-          ) : seedBody ? (
-            <div className="world-seed">
-              <div className="world-seed-label">World Seed</div>
-              <div className="world-prose"><ReactMarkdown>{stripMeta(seedBody)}</ReactMarkdown></div>
-            </div>
           ) : null}
 
-          <div className="world-prose" style={{ marginTop: seedBody && !seedGenerating ? 20 : 0 }}>
+          <div className="world-prose" style={{ marginTop: seedGenerating ? 20 : 0 }}>
             <ReactMarkdown>{stripMeta(recentHistory) || '*The world is quiet. No history has been recorded yet.*'}</ReactMarkdown>
           </div>
 
           {eventLines && (
             <div className="world-events">
               <div className="world-events-title">Recent Events</div>
-              {stripMeta(eventLines).split(/\n### /).filter(Boolean).map((e, i) => (
+               {stripMeta(eventLines).split(/\n### /).filter(Boolean).reverse().map((e, i) => (
                 <div key={i} className="event-item"><ReactMarkdown>{e.trim()}</ReactMarkdown></div>
               ))}
+            </div>
+          )}
+
+          {seedBody && (
+            <div className="world-seed" style={{ marginTop: 20 }}>
+              <div className="world-seed-label">World Seed</div>
+              <div className="world-prose"><ReactMarkdown>{stripMeta(seedBody)}</ReactMarkdown></div>
             </div>
           )}
         </div>

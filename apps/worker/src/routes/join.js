@@ -7,7 +7,7 @@ export async function handleJoin(request, env) {
   const { error, data } = await requireBody(request, ['gameId', 'inviteToken', 'characterName', 'characterBio', 'characterLocation']);
   if (error) return error;
 
-  const { gameId, inviteToken, characterName, characterBio, characterLocation } = data;
+  const { gameId, inviteToken, characterName, characterBio, characterLocation, characterGender } = data;
 
   // Validate invite token
   const inviteRaw = await env.KV.get(`invite:${inviteToken}`);
@@ -109,7 +109,7 @@ export async function handleJoin(request, env) {
 
   // Update game.json in repo and KV
   const players = game.players.map(p =>
-    p.id === playerId ? { ...p, joined: true, character: characterName, inviteToken: null } : p,
+    p.id === playerId ? { ...p, joined: true, character: characterName, gender: characterGender || '', inviteToken: null } : p,
   );
   await putGame(env, gameId, { ...game, players });
 
@@ -129,7 +129,7 @@ export async function handleJoin(request, env) {
       // Add or update the player in the roster
       const existing = currentGame.players ?? [];
       const idx = existing.findIndex(p => p.id === playerId);
-      const playerEntry = { id: playerId, character: characterName, bio: characterBio, joined: true, is_founder: false };
+      const playerEntry = { id: playerId, character: characterName, bio: characterBio, gender: characterGender || '', joined: true, is_founder: false };
       if (idx >= 0) existing[idx] = playerEntry;
       else existing.push(playerEntry);
       currentGame.players = existing;

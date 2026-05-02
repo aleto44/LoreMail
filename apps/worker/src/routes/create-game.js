@@ -40,6 +40,7 @@ export async function handleCreateGame(request, env) {
     founderCharacterName,
     founderCharacterBio,
     founderCharacterLocation,
+    founderCharacterGender,
     gameId: requestedGameId,
     passphrase: requestedPassphrase,
   } = data;
@@ -80,6 +81,7 @@ export async function handleCreateGame(request, env) {
         character: founderCharacterName,
         bio: founderCharacterBio,
         location: founderCharacterLocation || 'Unknown',
+        gender: founderCharacterGender || '',
         joined: true,
         is_founder: true,
       },
@@ -121,7 +123,7 @@ export async function handleCreateGame(request, env) {
     hashedPassphrase,
     githubToken: founderGithubToken,
     founderId,
-    players: [{ id: founderId, character: founderCharacterName, joined: true, inviteToken: null, is_founder: true }],
+    players: [{ id: founderId, character: founderCharacterName, gender: founderCharacterGender || '', joined: true, inviteToken: null, is_founder: true }],
   });
 
   // Store founder session

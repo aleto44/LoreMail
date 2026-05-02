@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LetterPreview } from './LetterPreview.jsx';
 
 export function LettersScreen({ session, data, loading, onReadLetter }) {
   const [copied, setCopied] = useState(false);
@@ -37,17 +38,13 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
         <>
           <div className="section-title">Received</div>
           {inbox.map(letter => (
-            <div
-              key={letter.id}
-              className="letter-row"
-              onClick={() => onReadLetter(letter)}
-            >
-              <div className="letter-dot" />
-              <div className="letter-row-meta">
-                <div className="letter-row-from">from {formatSenderName(letter.from, data)}</div>
-                <div className="letter-row-preview">{letter.body.split('\n')[0]?.slice(0, 60)}…</div>
-                <div className="letter-row-time">{letter.arrivedLabel}</div>
-              </div>
+            <div key={letter.id} className="letter-row">
+              <LetterPreview
+                letter={letter}
+                data={data}
+                onOpen={onReadLetter}
+              />
+              <div className="letter-row-time">{letter.arrivedLabel}</div>
             </div>
           ))}
         </>
@@ -71,16 +68,14 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
         <>
           <div className="section-title">Sent</div>
           {sent.map(letter => (
-            <div
-              key={letter.id}
-              className="letter-row letter-row--sent"
-              onClick={() => onReadLetter(letter)}
-            >
-              <div className="letter-row-meta">
-                <div className="letter-row-from">to {formatRecipientName(letter.to, data)}</div>
-                <div className="letter-row-preview">{letter.body.split('\n')[0]?.slice(0, 60)}…</div>
-                <div className="letter-row-time">{letter.arrivedLabel}</div>
-              </div>
+            <div key={letter.id} className="letter-row letter-row--sent">
+              <LetterPreview
+                letter={letter}
+                data={data}
+                onOpen={onReadLetter}
+                isSent
+              />
+              <div className="letter-row-time">{letter.arrivedLabel}</div>
             </div>
           ))}
         </>

@@ -40,6 +40,7 @@ export function JoinFlow({ gameId, inviteToken, workerUrl, onJoined }) {
   const [charName, setCharName] = useState('');
   const [charBio, setCharBio] = useState('');
   const [charLocation, setCharLocation] = useState('');
+  const [charGender, setCharGender] = useState('');
   const [error, setError] = useState('');
   const [worldInfo, setWorldInfo] = useState({ worldName: null, seedExcerpt: null, inviteLetter: null });
   const [envelopeOpening, setEnvelopeOpening] = useState(false);
@@ -77,7 +78,7 @@ export function JoinFlow({ gameId, inviteToken, workerUrl, onJoined }) {
       const res = await fetch(`${workerUrl}/game/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId, inviteToken, characterName: charName, characterBio: charBio, characterLocation: charLocation }),
+        body: JSON.stringify({ gameId, inviteToken, characterName: charName, characterBio: charBio, characterLocation: charLocation, characterGender: charGender }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Join failed');
@@ -190,6 +191,15 @@ export function JoinFlow({ gameId, inviteToken, workerUrl, onJoined }) {
               onChange={e => setCharLocation(e.target.value)}
               placeholder="Somewhere on the road between two cities I'd rather not name."
               rows={2}
+            />
+          </div>
+          <div className="field">
+            <label>Gender (optional)</label>
+            <input
+              type="text"
+              value={charGender}
+              onChange={e => setCharGender(e.target.value)}
+              placeholder="e.g. woman, man, non-binary"
             />
           </div>
           {error && <div className="error-msg">{error}</div>}

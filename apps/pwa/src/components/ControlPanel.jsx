@@ -36,7 +36,9 @@ async function probeModel(modelId, token) {
 
 export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle }) {
   const [gmPaused, setGmPaused] = useState(data?.game?.gm_paused ?? false);
+  const [gmPausedSaving, setGmPausedSaving] = useState(false);
   const [instantDelivery, setInstantDelivery] = useState(data?.game?.instant_delivery ?? false);
+  const [instantDeliverySaving, setInstantDeliverySaving] = useState(false);
   const [model, setModel] = useState(data?.game?.model ?? '');
   const [gmStyle, setGmStyle] = useState(data?.game?.gm_style ?? 'medium');
   const [travelHours, setTravelHours] = useState(data?.game?.default_travel_hours ?? 24);
@@ -53,9 +55,10 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   const [inviteLetterBody, setInviteLetterBody] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
 
-  const game = data?.game;
-  const status = data?.gmStatus;
-  const characters = data?.characters ?? {};
+   const game = data?.game;
+   const status = data?.gmStatus;
+   const characters = data?.characters ?? {};
+   const seedGenerating = data?.seedGenerating ?? false;
 
   async function patchConfig(changes) {
     if (!passphrase) { setMsg('Enter your passphrase first.'); return false; }
@@ -134,9 +137,10 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
     }
   }
 
-  async function sendInvite() {
-    if (!passphrase) { setMsg('Enter passphrase first.'); return; }
-    if (!inviteLetterBody.trim()) { setMsg('Write an invite letter first.'); return; }
+   async function sendInvite() {
+     if (!passphrase) { setMsg('Enter passphrase first.'); return; }
+     if (seedGenerating) { setMsg('World seed generation is still in progress. Please wait before sending invites.'); return; }
+     if (!inviteLetterBody.trim()) { setMsg('Write an invite letter first.'); return; }
     setInviteLoading(true);
     setMsg('');
     try {
@@ -380,21 +384,55 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
           </div>
         </div>
 
-        <div className="control-row">
-          <label>GM Paused</label>
-          <button
-            className={`toggle${gmPaused ? ' on' : ''}`}
-            onClick={async () => { const next = !gmPaused; const ok = await patchConfig({ gameChanges: { gm_paused: next } }); if (ok) setGmPaused(next); }}
-          />
-        </div>
+         <div className="control-row">
+           <label>GM Paused</label>
+           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+             <button
+               className={`toggle${gmPaused ? ' on' : ''}`}
+               onClick={async () => {
+                 const next = !gmPaused;
+                 setGmPausedSaving(true);
+                 const ok = await patchConfig({ gameChanges: { gm_paused: next } });
+                 if (ok) {
+                   setGmPaused(next);
+                 }
+                 setGmPausedSaving(false);
+               }}
+               disabled={gmPausedSaving}
+             />
+             {gmPausedSaving && <span style={{ fontSize: 12, color: 'var(--faded)' }}>saving…</span>}
+             {!gmPausedSaving && (
+               <span style={{ fontSize: 12, color: 'var(--faded)', minWidth: 80 }}>
+                 {gmPaused ? '✓ paused' : 'running'}
+               </span>
+             )}
+           </div>
+         </div>
 
-        <div className="control-row">
-          <label>⚡ Instant Delivery <span style={{ fontSize: 11, color: 'var(--faded)' }}>(dev)</span></label>
-          <button
-            className={`toggle${instantDelivery ? ' on' : ''}`}
-            onClick={async () => { const next = !instantDelivery; const ok = await patchConfig({ gameChanges: { instant_delivery: next } }); if (ok) setInstantDelivery(next); }}
-          />
-        </div>
+         <div className="control-row">
+           <label>⚡ Instant Delivery <span style={{ fontSize: 11, color: 'var(--faded)' }}>(dev)</span></label>
+           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+             <button
+               className={`toggle${instantDelivery ? ' on' : ''}`}
+               onClick={async () => {
+                 const next = !instantDelivery;
+                 setInstantDeliverySaving(true);
+                 const ok = await patchConfig({ gameChanges: { instant_delivery: next } });
+                 if (ok) {
+                   setInstantDelivery(next);
+                 }
+                 setInstantDeliverySaving(false);
+               }}
+               disabled={instantDeliverySaving}
+             />
+             {instantDeliverySaving && <span style={{ fontSize: 12, color: 'var(--faded)' }}>saving…</span>}
+             {!instantDeliverySaving && (
+               <span style={{ fontSize: 12, color: 'var(--faded)', minWidth: 80 }}>
+                 {instantDelivery ? '✓ enabled' : 'disabled'}
+               </span>
+             )}
+           </div>
+         </div>
 
         <div className="control-row">
           <label>Default Travel Time</label>
@@ -510,9 +548,14 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
           </div>
         ))}
 
-        <button className="control-btn" style={{ marginTop: 8 }} onClick={() => setShowInviteForm(v => !v)}>
-          {showInviteForm ? 'Cancel' : '+ Invite New Player'}
-        </button>
+        <button className="control-btn" style={{ marginTop: 8 }} onClick={() => setShowInviteForm(v => !v)} disabled={seedGenerating}>
+           {showInviteForm ? 'Cancel' : '+ Invite New Player'}
+         </button>
+         {seedGenerating && (
+           <div style={{ fontSize: 12, color: 'var(--faded)', marginTop: 8, fontStyle: 'italic' }}>
+             ⏳ World seed generation in progress — invites will be available shortly.
+           </div>
+         )}
         {showInviteForm && (
           <div style={{ paddingTop: 12 }}>
             <p style={{ fontSize: 12, color: 'var(--faded)', marginBottom: 8, lineHeight: 1.5 }}>
@@ -525,13 +568,13 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
               rows={5}
               style={{ marginBottom: 8 }}
             />
-            <button
-              className="btn-primary"
-              onClick={sendInvite}
-              disabled={inviteLoading || !passphrase}
-            >
-              {inviteLoading ? 'Sending…' : 'Send Invite & Copy Link →'}
-            </button>
+             <button
+               className="btn-primary"
+               onClick={sendInvite}
+               disabled={inviteLoading || !passphrase || seedGenerating}
+             >
+               {inviteLoading ? 'Sending…' : 'Send Invite & Copy Link →'}
+             </button>
           </div>
         )}
       </div>
