@@ -108,26 +108,8 @@ export default function App() {
     if (tab === 'letters') markLettersSeen();
   }, [tab, markLettersSeen]);
 
-  // Register push notifications once the player has a session
-  const { pushStatus, pushError, retrySubscribe, forceResubscribe, sendTestNotification } = usePushNotifications(session);
-  const [testNotifResult, setTestNotifResult] = useState(null);
-
-  const handleTestNotification = useCallback(async () => {
-    setTestNotifResult('sending…');
-    const result = await sendTestNotification();
-    if (result.ok) {
-      const endpointHint = result.endpoint ? ` (${result.endpoint})` : '';
-      setTestNotifResult(`✓ sent${endpointHint} — check phone`);
-      setTimeout(() => setTestNotifResult(null), 8000);
-    } else if (result.error?.includes('expired') || result.error?.includes('No push subscription')) {
-      // Subscription is stale — forceResubscribe was already triggered in the hook
-      setTestNotifResult('↻ re-enrolling…');
-      setTimeout(() => setTestNotifResult(null), 4000);
-    } else {
-      setTestNotifResult(`✗ ${result.error}`);
-      setTimeout(() => setTestNotifResult(null), 8000);
-    }
-  }, [sendTestNotification]);
+  // Register push notifications silently in the background
+  usePushNotifications(session);
 
    // Poll on focus
    useEffect(() => {
@@ -290,38 +272,6 @@ export default function App() {
           <button className={tab === 'control' ? 'active' : ''} onClick={() => handleSetTab('control')}>⚙ Control</button>
         )}
       </nav>
-
-      {/* Push notification status banner */}
-      {pushStatus === 'denied' && (
-        <div className="push-banner push-banner--warn">
-          🔕 Notifications blocked. Enable them in browser settings, then{' '}
-          <button className="push-banner-btn" onClick={retrySubscribe}>retry</button>.
-        </div>
-      )}
-      {pushStatus === 'unsupported' && (
-        <div className="push-banner push-banner--warn">
-          🔕 Push notifications aren't supported in this browser.
-        </div>
-      )}
-      {pushStatus === 'error' && (
-        <div className="push-banner push-banner--warn">
-          🔔 Notifications failed: {pushError}.{' '}
-          <button className="push-banner-btn" onClick={retrySubscribe}>retry</button>
-        </div>
-      )}
-      {pushStatus === 'idle' && (
-        <div className="push-banner push-banner--info">
-          🔔 <button className="push-banner-btn" onClick={retrySubscribe}>Enable notifications</button>
-        </div>
-      )}
-      {pushStatus === 'subscribed' && (
-        <div className="push-banner push-banner--subscribed">
-          🔔 Notifications on{' '}
-          <button className="push-banner-btn" onClick={handleTestNotification}>
-            {testNotifResult ?? 'send test'}
-          </button>
-        </div>
-      )}
 
       {/* Android back button exit toast */}
       {showExitToast && (
