@@ -23,11 +23,13 @@ export function useLettersBadge(session, deliveredLetters) {
     key ? (parseInt(localStorage.getItem(key) ?? '0', 10) || 0) : 0,
   );
 
-  const unreadCount = deliveredLetters
+  const newLetters = deliveredLetters
     ? deliveredLetters.filter(
         l => l.to === playerId && l.deliverAt > lastSeenRef.current,
-      ).length
-    : 0;
+      )
+    : [];
+
+  const unreadCount = newLetters.length;
 
   // Keep the app-icon badge in sync whenever unread count changes
   useEffect(() => {
@@ -49,5 +51,5 @@ export function useLettersBadge(session, deliveredLetters) {
     }
   }, [key]);
 
-  return { unreadCount, markLettersSeen };
+  return { unreadCount, newLetters, markLettersSeen };
 }

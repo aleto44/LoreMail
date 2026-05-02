@@ -984,6 +984,159 @@ textarea { resize: vertical; min-height: 120px; }
 .loading { text-align: center; padding: 40px; color: var(--faded); font-style: italic; }
 .empty-state { text-align: center; padding: 60px 20px; color: var(--faded); font-size: 14px; }
 
+/* ── New Letter Announcement Overlay ── */
+@keyframes announcementOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes announcementCardRise {
+  from { opacity: 0; transform: translateY(48px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes announcementEnvelopeFloat {
+  0%, 100% { transform: translateY(0px) rotate(-1.5deg); }
+  50%      { transform: translateY(-14px) rotate(1.5deg); }
+}
+
+@keyframes announcementGlow {
+  0%, 100% { filter: drop-shadow(0 6px 24px rgba(122, 59, 30, 0.45)); }
+  50%      { filter: drop-shadow(0 10px 48px rgba(122, 59, 30, 0.85)) drop-shadow(0 0 80px rgba(200, 130, 50, 0.35)); }
+}
+
+.letter-announcement-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 38%, rgba(55, 30, 10, 0.72) 0%, rgba(8, 5, 2, 0.96) 100%);
+  animation: announcementOverlayIn 0.55s ease-out forwards;
+  padding: 24px;
+}
+
+.letter-announcement-card {
+  text-align: center;
+  animation: announcementCardRise 0.65s 0.15s ease-out both;
+  max-width: 340px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.letter-announcement-envelope-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32px;
+  cursor: pointer;
+  border-radius: 6px;
+  outline: none;
+  animation: announcementEnvelopeFloat 3.6s ease-in-out infinite,
+             announcementGlow 3.6s ease-in-out infinite;
+  transition: transform 0.12s;
+}
+
+.letter-announcement-envelope-wrap:hover {
+  animation-duration: 1.8s, 1.8s;
+}
+
+.letter-announcement-envelope-wrap:active {
+  transform: scale(0.97);
+}
+
+.letter-announcement-envelope-wrap:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+.letter-announcement-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(210, 175, 110, 0.7);
+  margin-bottom: 10px;
+}
+
+.letter-announcement-title {
+  font-family: 'IM Fell English', serif;
+  font-size: 30px;
+  color: #f5f0e8;
+  line-height: 1.25;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+}
+
+.letter-announcement-from {
+  font-family: 'IM Fell English', serif;
+  font-style: italic;
+  font-size: 17px;
+  color: rgba(210, 175, 110, 0.85);
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+.letter-announcement-divider {
+  width: 56px;
+  height: 1px;
+  background: rgba(210, 175, 110, 0.35);
+  margin: 0 auto 28px;
+}
+
+.letter-announcement-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  background: #7a3b1e;
+  color: #f5f0e8;
+  border: none;
+  border-radius: 4px;
+  padding: 16px 32px;
+  font-family: 'IM Fell English', serif;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.12s, box-shadow 0.2s;
+  box-shadow: 0 4px 24px rgba(122, 59, 30, 0.55), inset 0 1px 0 rgba(255,255,255,0.08);
+  margin-bottom: 16px;
+}
+
+.letter-announcement-open:hover {
+  background: #8e4522;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(122, 59, 30, 0.72), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.letter-announcement-open:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 12px rgba(122, 59, 30, 0.55);
+}
+
+.letter-announcement-open-icon {
+  font-size: 20px;
+}
+
+.letter-announcement-later {
+  background: none;
+  border: none;
+  color: rgba(210, 175, 110, 0.5);
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  font-family: inherit;
+  transition: color 0.15s;
+}
+
+.letter-announcement-later:hover {
+  color: rgba(210, 175, 110, 0.9);
+}
+
 .loremail-mark {
   font-family: 'IM Fell English', serif;
   letter-spacing: 0.25em;

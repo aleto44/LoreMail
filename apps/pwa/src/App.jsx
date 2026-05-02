@@ -5,6 +5,7 @@ import { WorldScreen } from './components/WorldScreen.jsx';
 import { LettersScreen } from './components/LettersScreen.jsx';
 import { ComposeScreen } from './components/ComposeScreen.jsx';
 import { ControlPanel } from './components/ControlPanel.jsx';
+import { NewLetterAnnouncement } from './components/NewLetterAnnouncement.jsx';
 import { useGameData } from './hooks/useGameData.js';
 import { usePushNotifications } from './hooks/usePushNotifications.js';
 import { useLettersBadge } from './hooks/useLettersBadge.js';
@@ -101,11 +102,36 @@ export default function App() {
   const { data, loading, refresh, patchData } = useGameData(session);
 
   // Unread-letter badge (app icon + tab indicator)
-  const { unreadCount, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters);
+  const { unreadCount, newLetters, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters);
+
+  // ── New-letter announcement ───────────────────────────────
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  const lastAnnouncedUnreadRef = useRef(0);
+
+  // Show (or re-show) announcement whenever the unread count rises
+  useEffect(() => {
+    if (unreadCount > 0 && unreadCount !== lastAnnouncedUnreadRef.current) {
+      lastAnnouncedUnreadRef.current = unreadCount;
+      setAnnouncementDismissed(false);
+    }
+    if (unreadCount === 0) {
+      lastAnnouncedUnreadRef.current = 0;
+    }
+  }, [unreadCount]);
+
+  const showAnnouncement =
+    unreadCount > 0 &&
+    !announcementDismissed &&
+    !composing &&
+    !readingLetter &&
+    !showChronicle;
 
   // Mark letters seen immediately when Letters tab is active
   useEffect(() => {
-    if (tab === 'letters') markLettersSeen();
+    if (tab === 'letters') {
+      markLettersSeen();
+      setAnnouncementDismissed(true);
+    }
   }, [tab, markLettersSeen]);
 
   // Register push notifications silently in the background
@@ -314,6 +340,19 @@ export default function App() {
            window.history.pushState({ view: 'composing' }, '');
          }} title="Compose">✦</button>
        )}
-    </div>
-  );
+
+       {/* New-letter arrival announcement */}
+       {showAnnouncement && (
+         <NewLetterAnnouncement
+           newLetters={newLetters}
+           data={data}
+           onOpen={() => {
+             setAnnouncementDismissed(true);
+             handleSetTab('letters');
+           }}
+           onDismiss={() => setAnnouncementDismissed(true)}
+         />
+       )}
+     </div>
+   );
 }
