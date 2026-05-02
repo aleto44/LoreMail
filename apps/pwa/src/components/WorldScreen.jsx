@@ -421,7 +421,9 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
   const seedGenerating = data?.seedGenerating ?? false;
 
   const recentMatch   = canon.match(/## RECENT HISTORY[\s\S]*?\n\n([\s\S]*)$/);
-  const recentHistory = recentMatch ? recentMatch[1].trim().split('\n\n').reverse().join('\n\n') : '';
+  const recentHistory = recentMatch
+    ? recentMatch[1].trim().split(/(?=### )/).filter(s => s.trim()).reverse().join('\n\n')
+    : '';
   const eventLines    = events.split('\n').filter(l => l && !l.startsWith('# ')).join('\n').trim();
   const seedBody      = seed.replace(/^#\s+World Seed\s*/i, '').trim();
 
