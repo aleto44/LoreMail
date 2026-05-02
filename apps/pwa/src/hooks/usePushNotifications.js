@@ -1,11 +1,5 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.amix.workers.dev';
-
-/**
- * Convert a base64url string to a Uint8Array — required by pushManager.subscribe()
- * for the applicationServerKey parameter.
- */
 function urlBase64ToUint8Array(base64url) {
   const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
   const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -14,33 +8,23 @@ function urlBase64ToUint8Array(base64url) {
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
   return bytes;
 }
-
 /**
  * usePushNotifications
  *
- * Returns { pushStatus, pushError, retrySubscribe } so the UI can show
- * status and offer a manual enable button.
+ * Returns { pushStatus, pushError, retrySubscribe, sendTestNotification }
  *
- * pushStatus values:
- *   'idle'        — not yet attempted
- *   'subscribed'  — fully registered with server
- *   'denied'      — user denied notification permission
- *   'unsupported' — browser / platform doesn't support push
- *   'error'       — something failed (see pushError)
+ * pushStatus: 'idle' | 'subscribed' | 'denied' | 'unsupported' | 'error'
  */
 export function usePushNotifications(session) {
   const subscribedRef = useRef(false);
   const [pushStatus, setPushStatus] = useState('idle');
   const [pushError, setPushError] = useState(null);
-
   const subscribe = useCallback(async () => {
     if (subscribedRef.current) return;
     if (!session?.gameId || !session?.playerId) {
       console.log('[Push] No session yet, skipping');
       return;
     }
-
-    // Feature detection
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.warn('[Push] serviceWorker or PushManager not supported');
       setPushStatus('unsupported');
@@ -51,19 +35,16 @@ export function usePushNotifications(session) {
       setPushStatus('unsupported');
       return;
     }
-
     if (Notification.permission === 'denied') {
       console.warn('[Push] Notification permission is denied');
       setPushStatus('denied');
       return;
     }
-
     try {
-      console.log('[Push] Waiting for service worker to be ready...');
+      console.log('[Push] Waiting for service worker...');
       const registration = await navigator.serviceWorker.ready;
-      console.log('[Push] Service worker ready:', registration.scope);
-
-      console.log('[Push] Fetching VAPID public key...');
+      console.log('[Push] SW ready:', registration.scope);
+      console.log('[Push] Fetching VAPID key...');
       const keyRes = await fetch(`${WORKER_URL}/push/vapid-key`);
       if (!keyRes.ok) {
         const msg = `VAPID key fetch failed: ${keyRes.status}`;
@@ -72,7 +53,6 @@ export function usePushNotifications(session) {
         setPushError(msg);
         return;
       }
-
       const { publicKey } = await keyRes.json();
       if (!publicKey) {
         const msg = 'No publicKey in VAPID response';
@@ -81,28 +61,23 @@ export function usePushNotifications(session) {
         setPushError(msg);
         return;
       }
-      console.log('[Push] Got VAPID key ✓');
-
       let subscription = await registration.pushManager.getSubscription();
-      console.log('[Push] Existing subscription:', subscription ? 'yes' : 'none');
-
+      console.log('[Push] Existing subscription:', subscription ? subscription.endpoint.slice(0, 60) + '...' : 'none');
       if (!subscription) {
-        console.log('[Push] Requesting notification permission...');
+        console.log('[Push] Requesting permission...');
         const permission = await Notification.requestPermission();
-        console.log('[Push] Permission result:', permission);
+        console.log('[Push] Permission:', permission);
         if (permission !== 'granted') {
           setPushStatus('denied');
           return;
         }
-
-        console.log('[Push] Subscribing to push service...');
+        console.log('[Push] Subscribing...');
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
-        console.log('[Push] Push subscription created ✓');
+        console.log('[Push] Subscribed');
       }
-
       if (!subscription) {
         const msg = 'pushManager.subscribe returned null';
         console.warn('[Push]', msg);
@@ -110,19 +85,17 @@ export function usePushNotifications(session) {
         setPushError(msg);
         return;
       }
-
-      console.log('[Push] Registering subscription with Worker...');
+      console.log('[Push] Registering with Worker...');
       const subJson = subscription.toJSON();
       const res = await fetch(`${WORKER_URL}/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          gameId:       session.gameId,
-          playerId:     session.playerId,
+          gameId:   session.gameId,
+          playerId: session.playerId,
           subscription: subJson,
         }),
       });
-
       if (!res.ok) {
         const msg = `Worker subscribe failed: ${res.status}`;
         console.warn('[Push]', msg);
@@ -130,30 +103,41 @@ export function usePushNotifications(session) {
         setPushError(msg);
         return;
       }
-
       subscribedRef.current = true;
       setPushStatus('subscribed');
       setPushError(null);
-      console.log('[Push] Push notifications subscribed ✓');
+      console.log('[Push] All done - push notifications active');
     } catch (e) {
-      console.warn('[Push] Push subscription failed:', e.message, e);
+      console.warn('[Push] Failed:', e.message, e);
       setPushStatus('error');
       setPushError(e.message);
     }
   }, [session]);
-
-  // Manual retry — also resets the subscribed guard so it can re-run
   const retrySubscribe = useCallback(() => {
     subscribedRef.current = false;
     setPushStatus('idle');
     setPushError(null);
     subscribe();
   }, [subscribe]);
-
+  const sendTestNotification = useCallback(async () => {
+    if (!session?.gameId || !session?.playerId) return { ok: false, error: 'No session' };
+    try {
+      const res = await fetch(`${WORKER_URL}/push/self-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: session.gameId, playerId: session.playerId }),
+      });
+      const data = await res.json();
+      console.log('[Push] Self-test result:', data);
+      return data;
+    } catch (e) {
+      console.warn('[Push] Self-test failed:', e.message);
+      return { ok: false, error: e.message };
+    }
+  }, [session]);
   useEffect(() => {
     const id = setTimeout(subscribe, 2000);
     return () => clearTimeout(id);
   }, [subscribe]);
-
-  return { pushStatus, pushError, retrySubscribe };
+  return { pushStatus, pushError, retrySubscribe, sendTestNotification };
 }

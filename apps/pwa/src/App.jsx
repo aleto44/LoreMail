@@ -22,14 +22,22 @@ export default function App() {
 
   // Handle Android back button
   useEffect(() => {
-    // Push initial state if not already present
-    if (!window.history.state) {
-      window.history.replaceState({ view: 'main' }, '');
-    }
+    // Always push a real history entry so Android back closes overlays
+    // instead of exiting the app immediately.
+    window.history.pushState({ view: 'main' }, '');
 
     const handlePopState = (e) => {
-      const state = e.state || { view: 'main' };
-      
+      const state = e.state;
+
+      if (!state || !state.view) {
+        // We've gone below our own history — stay in the app
+        window.history.pushState({ view: 'main' }, '');
+        setComposing(false);
+        setReadingLetter(null);
+        setShowChronicle(false);
+        return;
+      }
+
       // Restore state based on what was pushed
       if (state.view === 'reading') {
         setReadingLetter(state.letter || null);
@@ -44,7 +52,7 @@ export default function App() {
         setReadingLetter(null);
         setShowChronicle(false);
       } else {
-        // Default: return to main view
+        // 'main' or anything else — close all overlays
         setComposing(false);
         setReadingLetter(null);
         setShowChronicle(false);
@@ -71,7 +79,15 @@ export default function App() {
   const { data, loading, refresh, patchData } = useGameData(session);
 
   // Register push notifications once the player has a session
-  const { pushStatus, pushError, retrySubscribe } = usePushNotifications(session);
+  const { pushStatus, pushError, retrySubscribe, sendTestNotification } = usePushNotifications(session);
+  const [testNotifResult, setTestNotifResult] = useState(null);
+
+  const handleTestNotification = useCallback(async () => {
+    setTestNotifResult('sending…');
+    const result = await sendTestNotification();
+    setTestNotifResult(result.ok ? '✓ sent! Check your phone.' : `✗ ${result.error}`);
+    setTimeout(() => setTestNotifResult(null), 6000);
+  }, [sendTestNotification]);
 
    // Poll on focus
    useEffect(() => {
@@ -254,6 +270,14 @@ export default function App() {
       {pushStatus === 'idle' && (
         <div className="push-banner push-banner--info">
           🔔 <button className="push-banner-btn" onClick={retrySubscribe}>Enable notifications</button>
+        </div>
+      )}
+      {pushStatus === 'subscribed' && (
+        <div className="push-banner push-banner--subscribed">
+          🔔 Notifications on{' '}
+          <button className="push-banner-btn" onClick={handleTestNotification}>
+            {testNotifResult ?? 'send test'}
+          </button>
         </div>
       )}
 

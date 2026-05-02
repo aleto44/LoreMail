@@ -47,6 +47,11 @@ body {
   color: #7a5a10;
   border-bottom: 1px solid #e8d89a;
 }
+.push-banner--subscribed {
+  background: #eef6ee;
+  color: #2a6a2a;
+  border-bottom: 1px solid #b8dab8;
+}
 .push-banner-btn {
   background: none;
   border: none;
