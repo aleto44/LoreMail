@@ -23,7 +23,7 @@ export default defineConfig({
       },
     }),
   ],
-  base: '/',
+  base: process.env.NODE_ENV === 'production' ? '/LoreMail/' : '/',
   server: { port: 5173, strictPort: true },
   build: { outDir: 'dist' },
 });
