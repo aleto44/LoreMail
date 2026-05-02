@@ -7,6 +7,7 @@ import { ComposeScreen } from './components/ComposeScreen.jsx';
 import { ControlPanel } from './components/ControlPanel.jsx';
 import { useGameData } from './hooks/useGameData.js';
 import { usePushNotifications } from './hooks/usePushNotifications.js';
+import { useLettersBadge } from './hooks/useLettersBadge.js';
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.amix.workers.dev';
 
@@ -98,6 +99,14 @@ export default function App() {
   }, []);
 
   const { data, loading, refresh, patchData } = useGameData(session);
+
+  // Unread-letter badge (app icon + tab indicator)
+  const { unreadCount, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters);
+
+  // Mark letters seen immediately when Letters tab is active
+  useEffect(() => {
+    if (tab === 'letters') markLettersSeen();
+  }, [tab, markLettersSeen]);
 
   // Register push notifications once the player has a session
   const { pushStatus, pushError, retrySubscribe, sendTestNotification } = usePushNotifications(session);
@@ -271,7 +280,9 @@ export default function App() {
     <div className="app-shell">
       <nav className="tab-bar">
         <button className={tab === 'world' ? 'active' : ''} onClick={() => handleSetTab('world')}>The World</button>
-        <button className={tab === 'letters' ? 'active' : ''} onClick={() => handleSetTab('letters')}>Letters</button>
+        <button className={tab === 'letters' ? 'active' : ''} onClick={() => handleSetTab('letters')}>
+          Letters{unreadCount > 0 && <span className="tab-badge">{unreadCount}</span>}
+        </button>
         {session.isFounder && (
           <button className={tab === 'control' ? 'active' : ''} onClick={() => handleSetTab('control')}>⚙ Control</button>
         )}

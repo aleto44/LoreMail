@@ -27,12 +27,22 @@ self.addEventListener('push', (event) => {
     body:      data.body  ?? 'A new letter has arrived. Open Loremail to read it.',
     icon:      '/LoreMail/icon.svg',
     badge:     '/LoreMail/icon.svg',
-    tag:       'loremail-letter',   // collapse multiple rapid notifications
+    tag:       'loremail-letter',
     renotify:  true,
     data:      { url: data.url ?? '/LoreMail/' },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  // Set the app-icon badge — works even when Android suppresses the notification popup
+  const setBadge = self.navigator?.setAppBadge
+    ? self.navigator.setAppBadge(1).catch(() => {})
+    : Promise.resolve();
+
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      setBadge,
+    ]),
+  );
 });
 
 // ─── Notification Click ───────────────────────────────────────────────────────
@@ -40,6 +50,11 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = event.notification.data?.url ?? '/LoreMail/';
+
+  // Clear the app-icon badge when the user taps the notification
+  if (self.navigator?.clearAppBadge) {
+    self.navigator.clearAppBadge().catch(() => {});
+  }
 
   event.waitUntil(
     clients

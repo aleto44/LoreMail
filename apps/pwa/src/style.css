@@ -109,6 +109,25 @@ body {
   border-bottom-color: var(--accent);
 }
 
+/* Unread count badge on the Letters tab */
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  margin-left: 5px;
+  vertical-align: middle;
+  letter-spacing: 0;
+}
+
 /* ── Scroll container ── */
 .screen-content {
   flex: 1;
