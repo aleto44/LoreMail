@@ -126,15 +126,16 @@ export default function App() {
     !readingLetter &&
     !showChronicle;
 
-  // Mark letters seen when on letters tab — but only AFTER the announcement
-  // has been acknowledged (or there is nothing new to announce). Without this
-  // guard, the effect runs immediately on mount (default tab is 'letters') and
-  // kills the announcement before it ever renders.
+  // Mark letters seen when on letters tab — but ONLY after data has finished
+  // loading. Without the `!loading && data` guard the effect fires immediately
+  // on mount (data = null, unreadCount = 0, condition is true) and stamps
+  // lastSeenRef with "now", causing ALL existing letters to appear already-seen
+  // when data finally arrives, so the announcement never shows.
   useEffect(() => {
-    if (tab === 'letters' && (unreadCount === 0 || announcementDismissed)) {
+    if (!loading && data && tab === 'letters' && (unreadCount === 0 || announcementDismissed)) {
       markLettersSeen();
     }
-  }, [tab, unreadCount, announcementDismissed, markLettersSeen]);
+  }, [tab, unreadCount, announcementDismissed, markLettersSeen, loading, data]);
 
   // Register push notifications silently in the background
   usePushNotifications(session);

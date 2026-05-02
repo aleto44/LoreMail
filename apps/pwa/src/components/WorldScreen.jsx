@@ -156,7 +156,7 @@ function PeopleTab({ worldPeople, lastSeen }) {
 
 function MapTab({ worldMap, lastSeen, session, characters }) {
   const rawNodes        = worldMap?.nodes ?? [];
-  const edges           = worldMap?.edges ?? [];
+  let   edges           = worldMap?.edges ?? [];
   const rawPlayerLocs   = worldMap?.player_locations ?? {};   // { playerId: nodeId }
 
   // ── Synthesise nodes from character location.md when the GM hasn't yet
@@ -235,6 +235,35 @@ function MapTab({ worldMap, lastSeen, session, characters }) {
       playerLocations = newLocs;
     }
   }
+
+  // Synthesise ghost nodes for any edge endpoints that don't exist in the
+  // nodes array (e.g. an edge "cybercity-435 → coastal-region" where the map
+  // only has "cybercity-435-undergrounds"). Without this the edge is silently
+  // dropped because positions[e.from] is undefined.
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const ghostNodes = [];
+  edges.forEach(e => {
+    [e.from, e.to].forEach(missingId => {
+      if (!nodeIds.has(missingId)) {
+        // Try prefix-match against existing nodes first (e.g. "cybercity-435"
+        // matches "cybercity-435-undergrounds").
+        const match = nodes.find(n => n.id.startsWith(missingId + '-') || missingId.startsWith(n.id + '-'));
+        if (match) {
+          // Remap the edge to the matched node so we don't need a ghost node
+          edges = edges.map(ed => ({
+            ...ed,
+            from: ed.from === missingId ? match.id : ed.from,
+            to:   ed.to   === missingId ? match.id : ed.to,
+          }));
+        } else if (!ghostNodes.find(n => n.id === missingId)) {
+          const label = missingId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          ghostNodes.push({ id: missingId, label, _ghost: true });
+          nodeIds.add(missingId);
+        }
+      }
+    });
+  });
+  if (ghostNodes.length) nodes = [...nodes, ...ghostNodes];
 
   const positions = useForceLayout(nodes, edges);
 
