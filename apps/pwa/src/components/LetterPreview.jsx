@@ -34,7 +34,7 @@ function EnvelopeSVG({ opening }) {
   );
 }
 
-export function LetterPreview({ letter, data, onOpen, isSent }) {
+export function LetterPreview({ letter, data, onOpen, isSent, isNew }) {
   const [opening, setOpening] = useState(false);
 
   const handleClick = () => {
@@ -63,7 +63,10 @@ export function LetterPreview({ letter, data, onOpen, isSent }) {
         <EnvelopeSVG opening={opening} />
       </div>
       <div className="letter-preview-meta">
-        <div className="letter-preview-from">{displayName}</div>
+        <div className="letter-preview-from">
+          {displayName}
+          {isNew && <span className="letter-new-badge">NEW</span>}
+        </div>
         <div className="letter-preview-label">click to open</div>
       </div>
     </div>

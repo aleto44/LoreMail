@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { LetterPreview } from './LetterPreview.jsx';
 
-export function LettersScreen({ session, data, loading, onReadLetter }) {
+export function LettersScreen({ session, data, loading, onReadLetter, newLetters = [] }) {
   const [copied, setCopied] = useState(false);
+
+  // Build a Set of new letter IDs for O(1) lookup
+  const newLetterIds = new Set(newLetters.map(l => l.id));
 
   function copyPlayerId() {
     navigator.clipboard.writeText(session.playerId).then(() => {
@@ -38,11 +41,12 @@ export function LettersScreen({ session, data, loading, onReadLetter }) {
         <>
           <div className="section-title">Received</div>
           {inbox.map(letter => (
-            <div key={letter.id} className="letter-row">
+            <div key={letter.id} className={`letter-row${newLetterIds.has(letter.id) ? ' letter-row--new' : ''}`}>
               <LetterPreview
                 letter={letter}
                 data={data}
                 onOpen={onReadLetter}
+                isNew={newLetterIds.has(letter.id)}
               />
               <div className="letter-row-time">{letter.arrivedLabel}</div>
             </div>

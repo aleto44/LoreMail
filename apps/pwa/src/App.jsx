@@ -126,13 +126,15 @@ export default function App() {
     !readingLetter &&
     !showChronicle;
 
-  // Mark letters seen immediately when Letters tab is active
+  // Mark letters seen when on letters tab — but only AFTER the announcement
+  // has been acknowledged (or there is nothing new to announce). Without this
+  // guard, the effect runs immediately on mount (default tab is 'letters') and
+  // kills the announcement before it ever renders.
   useEffect(() => {
-    if (tab === 'letters') {
+    if (tab === 'letters' && (unreadCount === 0 || announcementDismissed)) {
       markLettersSeen();
-      setAnnouncementDismissed(true);
     }
-  }, [tab, markLettersSeen]);
+  }, [tab, unreadCount, announcementDismissed, markLettersSeen]);
 
   // Register push notifications silently in the background
   usePushNotifications(session);
@@ -311,6 +313,7 @@ export default function App() {
              data={data}
              loading={loading}
              onReadLetter={handleReadLetter}
+             newLetters={newLetters}
            />
          )}
         {tab === 'world' && (
@@ -348,9 +351,13 @@ export default function App() {
            data={data}
            onOpen={() => {
              setAnnouncementDismissed(true);
+             markLettersSeen();
              handleSetTab('letters');
            }}
-           onDismiss={() => setAnnouncementDismissed(true)}
+           onDismiss={() => {
+             setAnnouncementDismissed(true);
+             markLettersSeen();
+           }}
          />
        )}
      </div>
