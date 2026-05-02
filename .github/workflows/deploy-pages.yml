@@ -9,6 +9,7 @@ on:
       - 'apps/pwa/**'
       - 'apps/launcher/**'
       - 'packages/**'
+      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch: {}
 
 jobs:
