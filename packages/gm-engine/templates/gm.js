@@ -122,7 +122,7 @@ async function main() {
       processed++;
 
       deliveries.push({
-        letterId, success: true,
+        letterId, to: frontmatter.to, success: true,
         canonAddition: !!result.canonAddition,
         worldEvent: !!result.worldEvent,
         consistencyConflict: result.consistencyConflict,
@@ -132,7 +132,7 @@ async function main() {
       console.error(`Error processing ${letterId}:`, err.message);
       lastError = err;
       deliveries.push({
-        letterId, success: false,
+        letterId, to: frontmatter.to, success: false,
         canonAddition: false, worldEvent: false,
         consistencyConflict: false, error: err.message,
       });
@@ -152,6 +152,31 @@ async function main() {
   });
 
   console.log(`GM run complete. Processed: ${processed}. Success: ${lastError === null}.`);
+
+  // ── Push notifications ────────────────────────────────────────────────────
+  // Notify letter recipients via the Loremail Worker (best-effort, non-fatal).
+  if (processed > 0) {
+    const WORKER_URL = process.env.LOREMAIL_WORKER_URL;
+    const NOTIFY_TOKEN = process.env.LOREMAIL_NOTIFY_TOKEN;
+    const gameId = gameJson.id;
+    if (WORKER_URL && NOTIFY_TOKEN && gameId) {
+      const recipients = [...new Set(
+        deliveries.filter(d => d.success && d.to).map(d => d.to),
+      )];
+      if (recipients.length > 0) {
+        try {
+          const res = await fetch(`${WORKER_URL}/push/notify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameId, notifyToken: NOTIFY_TOKEN, recipients }),
+          });
+          console.log(`Push notify response: ${res.status}`);
+        } catch (e) {
+          console.warn('Push notify failed (non-fatal):', e.message);
+        }
+      }
+    }
+  }
 }
 
 main().catch(err => {

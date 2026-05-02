@@ -66,7 +66,11 @@ export async function handleCreateGame(request, env) {
   const repo = await createRepo(founderGithubToken, owner, repoName);
 
   // Build and commit all scaffold files
+  // Generate notify token for push notification auth (stored in KV + as GH secret)
+  const notifyToken = crypto.randomUUID();
+
   const gameJson = {
+    id: gameId,
     name: worldFlavour.split(' ').slice(0, 5).join(' '),
     flavour: worldFlavour,
     era,
@@ -113,8 +117,10 @@ export async function handleCreateGame(request, env) {
     await createFile(founderGithubToken, owner, repoName, filePath, content, `scaffold: ${filePath}`);
   }
 
-  // Store copilot token as GitHub Actions secret
+  // Store copilot token + push notify credentials as GitHub Actions secrets
   await setSecret(founderGithubToken, owner, repoName, 'COPILOT_TOKEN', copilotToken);
+  await setSecret(founderGithubToken, owner, repoName, 'LOREMAIL_NOTIFY_TOKEN', notifyToken);
+  await setSecret(founderGithubToken, owner, repoName, 'LOREMAIL_WORKER_URL', env.WORKER_URL ?? 'https://loremail-worker.amix.workers.dev');
 
   // Store game in KV
   await putGame(env, gameId, {
@@ -123,6 +129,7 @@ export async function handleCreateGame(request, env) {
     hashedPassphrase,
     githubToken: founderGithubToken,
     founderId,
+    notifyToken,
     players: [{ id: founderId, character: founderCharacterName, gender: founderCharacterGender || '', joined: true, inviteToken: null, is_founder: true }],
   });
 

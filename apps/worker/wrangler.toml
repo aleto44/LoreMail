@@ -15,8 +15,15 @@ local_protocol = "http"
 [vars]
 ENVIRONMENT = "production"
 PWA_URL = "https://aleto44.github.io/LoreMail"
+WORKER_URL = "https://loremail-worker.amix.workers.dev"
+# Push notification secrets — set these once with `wrangler secret put`:
+#   VAPID_PUBLIC_KEY   base64url raw EC P-256 public key (65 bytes)
+#   VAPID_PRIVATE_KEY  JWK JSON string of EC P-256 private key
+#   VAPID_SUBJECT      e.g. mailto:admin@loremail.app
+# Generate with: node scripts/generate-vapid-keys.mjs (from repo root)
 
 # ── Local development vars — used by `wrangler dev` ───────────────────────────
 [env.development.vars]
 ENVIRONMENT = "development"
 PWA_URL = "http://localhost:5173"
+WORKER_URL = "http://localhost:8787"

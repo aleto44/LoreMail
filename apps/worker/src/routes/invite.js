@@ -85,6 +85,6 @@ export async function handleInvite(request, env) {
   }
 
   const pwaUrl = (env.PWA_URL ?? 'https://loremail.app').replace(/\/$/, '');
-  const inviteLink = `${pwaUrl}/join?game=${gameId}&invite=${inviteToken}`;
+  const inviteLink = `${pwaUrl}/?game=${gameId}&invite=${inviteToken}`;
   return json({ inviteLink });
 }

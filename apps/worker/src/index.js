@@ -14,6 +14,8 @@ import { handleGameInfo } from './routes/game-info.js';
 import { handleListModels, handleProbeModel } from './routes/list-models.js';
 import { handleTriggerSeed } from './routes/trigger-seed.js';
 import { handleDeleteRepo } from './routes/delete-repo.js';
+import { handleGetVapidKey, handlePushSubscribe } from './routes/push-subscribe.js';
+import { handlePushNotify } from './routes/push-notify.js';
 import { corsHeaders, handleCors } from './lib/cors.js';
 
 export default {
@@ -41,6 +43,9 @@ export default {
       else if (method === 'POST' && path === '/models/probe') response = await handleProbeModel(request, env);
       else if (method === 'POST' && path === '/game/trigger-seed') response = await handleTriggerSeed(request, env);
       else if (method === 'DELETE' && path === '/game/repo') response = await handleDeleteRepo(request, env);
+      else if (method === 'GET'  && path === '/push/vapid-key') response = await handleGetVapidKey(request, env);
+      else if (method === 'POST' && path === '/push/subscribe') response = await handlePushSubscribe(request, env);
+      else if (method === 'POST' && path === '/push/notify')    response = await handlePushNotify(request, env);
       else response = json({ error: 'Not found' }, 404);
     } catch (err) {
       console.error('Worker error:', err);

@@ -1,6 +1,6 @@
 import './style.css';
 import devConfig from './dev-config.js';
-const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.aleto44.workers.dev';
+const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.amix.workers.dev';
 const PWA_URL = (import.meta.env.VITE_PWA_URL ?? 'https://loremail.app').replace(/\/$/, '');
 // ── State ──────────────────────────────────────────────
 const state = {

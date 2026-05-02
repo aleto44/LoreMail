@@ -148,7 +148,7 @@ async function main() {
       await ws.deliverLetter(letter.path);
       processed++;
       deliveries.push({
-        letterId, success: true,
+        letterId, to: frontmatter.to, success: true,
         canonAddition: !!result.canonAddition,
         worldEvent: !!result.worldEvent,
         consistencyConflict: result.consistencyConflict,
@@ -157,7 +157,7 @@ async function main() {
     } catch (err) {
       console.error('Error processing', letterId, err.message);
       lastError = err;
-      deliveries.push({ letterId, success: false, canonAddition: false, worldEvent: false, consistencyConflict: false, error: err.message });
+      deliveries.push({ letterId, to: frontmatter.to, success: false, canonAddition: false, worldEvent: false, consistencyConflict: false, error: err.message });
     }
   }
 
@@ -168,6 +168,32 @@ async function main() {
     compressionRan, deliveries,
   });
   console.log('GM done. Processed:', processed);
+
+  // ── Push notifications ───────────────────────────────────────────────────
+  // After the GM run (and before the workflow commits), notify recipients.
+  if (processed > 0) {
+    const WORKER_URL = process.env.LOREMAIL_WORKER_URL;
+    const NOTIFY_TOKEN = process.env.LOREMAIL_NOTIFY_TOKEN;
+    const gameId = gameJson.id;
+    if (WORKER_URL && NOTIFY_TOKEN && gameId) {
+      const recipients = [...new Set(
+        deliveries.filter(d => d.success && d.to).map(d => d.to),
+      )];
+      if (recipients.length > 0) {
+        try {
+          const res = await fetch(\`\${WORKER_URL}/push/notify\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameId, notifyToken: NOTIFY_TOKEN, recipients }),
+          });
+          console.log(\`Push notify response: \${res.status}\`);
+        } catch (e) {
+          // Non-fatal — letters are delivered, notification is best-effort
+          console.warn('Push notify failed (non-fatal):', e.message);
+        }
+      }
+    }
+  }
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
@@ -236,6 +262,8 @@ jobs:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
           TRIGGER: \${{ inputs.trigger || 'letter_delivery' }}
           PLAYER_ID: \${{ inputs.player_id || '' }}
+          LOREMAIL_NOTIFY_TOKEN: \${{ secrets.LOREMAIL_NOTIFY_TOKEN }}
+          LOREMAIL_WORKER_URL: \${{ secrets.LOREMAIL_WORKER_URL }}
       - name: Commit GM changes
         if: \${{ env.SKIP_GM != 'true' }}
         run: |

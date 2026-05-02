@@ -60,6 +60,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRIGGER: ${{ inputs.trigger || 'letter_delivery' }}
           PLAYER_ID: ${{ inputs.player_id || '' }}
+          LOREMAIL_NOTIFY_TOKEN: ${{ secrets.LOREMAIL_NOTIFY_TOKEN }}
+          LOREMAIL_WORKER_URL: ${{ secrets.LOREMAIL_WORKER_URL }}
       - name: Commit GM changes
         if: ${{ env.SKIP_GM != 'true' }}
         run: |

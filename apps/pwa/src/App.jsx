@@ -6,8 +6,9 @@ import { LettersScreen } from './components/LettersScreen.jsx';
 import { ComposeScreen } from './components/ComposeScreen.jsx';
 import { ControlPanel } from './components/ControlPanel.jsx';
 import { useGameData } from './hooks/useGameData.js';
+import { usePushNotifications } from './hooks/usePushNotifications.js';
 
-const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.aleto44.workers.dev';
+const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.amix.workers.dev';
 
 export default function App() {
   const [session, setSession] = useState(() => {
@@ -33,6 +34,9 @@ export default function App() {
   }, []);
 
   const { data, loading, refresh, patchData } = useGameData(session);
+
+  // Register push notifications once the player has a session
+  usePushNotifications(session);
 
   // Poll on focus
   useEffect(() => {
