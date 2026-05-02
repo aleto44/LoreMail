@@ -40,19 +40,19 @@ jobs:
 
       # 5. Build the Launcher
       #    VITE_WORKER_URL + VITE_PWA_URL come from apps/launcher/.env.production.
-      #    base is set to /LoreMail/launch/ in vite.config.js.
+      #    base is set to /LoreMail/launcher/ in vite.config.js.
       - name: Build Launcher
         run: npm run build --workspace=apps/launcher
 
       # 6. Merge both dist folders into a single output tree:
-      #      gh-pages root  →  apps/pwa/dist        (serves at /LoreMail/)
-      #      gh-pages/launch →  apps/launcher/dist   (serves at /LoreMail/launch/)
+      #      gh-pages root      →  apps/pwa/dist        (serves at /LoreMail/)
+      #      gh-pages/launcher  →  apps/launcher/dist   (serves at /LoreMail/launcher/)
       - name: Merge build outputs
         run: |
           mkdir -p deploy
           cp -r apps/pwa/dist/. deploy/
-          mkdir -p deploy/launch
-          cp -r apps/launcher/dist/. deploy/launch/
+          mkdir -p deploy/launcher
+          cp -r apps/launcher/dist/. deploy/launcher/
 
       # 7. Push the merged folder to the gh-pages branch.
       #    GitHub Pages serves this branch automatically (configure in repo Settings → Pages).
