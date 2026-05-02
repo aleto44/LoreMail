@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { JoinFlow } from './components/JoinFlow.jsx';
 import { RestoreFlow } from './components/RestoreFlow.jsx';
 import { WorldScreen } from './components/WorldScreen.jsx';
@@ -20,25 +20,34 @@ export default function App() {
   const [readingLetter, setReadingLetter] = useState(null);
   const [showChronicle, setShowChronicle] = useState(false);
 
+  // "Press back again to exit" toast
+  const [showExitToast, setShowExitToast] = useState(false);
+  const exitToastRef = useRef(null);
+
   // Handle Android back button
   useEffect(() => {
-    // Always push a real history entry so Android back closes overlays
-    // instead of exiting the app immediately.
+    // Replace the page-load entry with a known state, then push a guard
+    // entry so Android back has to pop through our stack before exiting.
+    window.history.replaceState({ view: 'main' }, '');
     window.history.pushState({ view: 'main' }, '');
 
     const handlePopState = (e) => {
       const state = e.state;
 
       if (!state || !state.view) {
-        // We've gone below our own history — stay in the app
+        // Fallen below our history — show "press again to exit" toast
         window.history.pushState({ view: 'main' }, '');
         setComposing(false);
         setReadingLetter(null);
         setShowChronicle(false);
+        // Show exit toast
+        setShowExitToast(true);
+        clearTimeout(exitToastRef.current);
+        exitToastRef.current = setTimeout(() => setShowExitToast(false), 2000);
         return;
       }
 
-      // Restore state based on what was pushed
+      // Close whatever overlay matches the state we're returning to
       if (state.view === 'reading') {
         setReadingLetter(state.letter || null);
         setComposing(false);
@@ -52,7 +61,7 @@ export default function App() {
         setReadingLetter(null);
         setShowChronicle(false);
       } else {
-        // 'main' or anything else — close all overlays
+        // 'main' — close all overlays
         setComposing(false);
         setReadingLetter(null);
         setShowChronicle(false);
@@ -60,7 +69,10 @@ export default function App() {
     };
 
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      clearTimeout(exitToastRef.current);
+    };
   }, []);
 
   // Remaining post-join refresh attempts (counts down to 0)
@@ -85,8 +97,15 @@ export default function App() {
   const handleTestNotification = useCallback(async () => {
     setTestNotifResult('sending…');
     const result = await sendTestNotification();
-    setTestNotifResult(result.ok ? '✓ sent! Check your phone.' : `✗ ${result.error}`);
-    setTimeout(() => setTestNotifResult(null), 6000);
+    if (result.ok) {
+      const endpointHint = result.endpoint
+        ? ` (${result.endpoint})`
+        : '';
+      setTestNotifResult(`✓ sent${endpointHint} — check phone`);
+    } else {
+      setTestNotifResult(`✗ ${result.error}`);
+    }
+    setTimeout(() => setTestNotifResult(null), 8000);
   }, [sendTestNotification]);
 
    // Poll on focus
@@ -279,6 +298,11 @@ export default function App() {
             {testNotifResult ?? 'send test'}
           </button>
         </div>
+      )}
+
+      {/* Android back button exit toast */}
+      {showExitToast && (
+        <div className="exit-toast">Press back again to exit</div>
       )}
 
       <div className="screen-content">

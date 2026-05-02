@@ -52,6 +52,22 @@ body {
   color: #2a6a2a;
   border-bottom: 1px solid #b8dab8;
 }
+
+/* ── Android back-button exit toast ── */
+.exit-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30,24,18,0.85);
+  color: #f5f0e8;
+  font-size: 13px;
+  padding: 8px 18px;
+  border-radius: 20px;
+  z-index: 999;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .push-banner-btn {
   background: none;
   border: none;

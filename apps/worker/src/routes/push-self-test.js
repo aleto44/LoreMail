@@ -46,7 +46,18 @@ export async function handlePushSelfTest(request, env) {
     }
 
     const ok = res.status < 300 || res.status === 201;
-    return json({ ok, status: res.status });
+    // Return endpoint hint so the client can confirm which push service / device
+    const endpointHost = (() => {
+      try {
+        const h = new URL(subscription.endpoint).hostname;
+        if (h.includes('fcm') || h.includes('google')) return 'Android/Chrome';
+        if (h.includes('apple')) return 'Apple';
+        if (h.includes('mozilla') || h.includes('firefox')) return 'Firefox';
+        if (h.includes('windows') || h.includes('microsoft')) return 'Windows/Edge';
+        return h;
+      } catch { return 'unknown'; }
+    })();
+    return json({ ok, status: res.status, endpoint: endpointHost });
   } catch (e) {
     console.error('Push self-test error:', e.message);
     return json({ ok: false, error: e.message }, 500);
