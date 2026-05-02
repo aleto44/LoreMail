@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import path from 'path';
 
 export default defineConfig(({ mode }) => ({
-  base: '/LoreMail/launch/',
+  base: '/LoreMail/launcher/',
   server: { port: 5174, strictPort: true },
   build: { outDir: 'dist' },
   resolve: {
