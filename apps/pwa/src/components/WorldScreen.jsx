@@ -368,11 +368,13 @@ function FactionsTab({ worldFactions, lastSeen }) {
       {factions.map(faction => {
         const isNew     = faction.first_mentioned > lastSeen;
         const isUpdated = !isNew && faction.last_updated > lastSeen;
+        // Use the faction's ID as their name (capitalized)
+        const displayName = faction.id.charAt(0).toUpperCase() + faction.id.slice(1);
         return (
           <div key={faction.id} className="lore-card">
             {isNew     && <Badge type="new" />}
             {isUpdated && <Badge type="updated" />}
-            <div className="lore-card-name">{faction.name}</div>
+            <div className="lore-card-name">{displayName}</div>
             <div className="lore-card-body">{faction.description}</div>
             {faction.disposition && <div className="lore-card-status">disposition: {faction.disposition}</div>}
           </div>
