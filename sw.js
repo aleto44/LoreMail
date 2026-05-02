@@ -98,7 +98,7 @@ class I {
   }
 }
 let p;
-function W() {
+function A() {
   if (p === void 0) {
     const a = new Response("");
     if ("body" in a)
@@ -111,7 +111,7 @@ function W() {
   }
   return p;
 }
-async function A(a, e) {
+async function W(a, e) {
   let t = null;
   if (a.url && (t = new URL(a.url).origin), t !== self.location.origin)
     throw new l("cross-origin-copy-response", { origin: t });
@@ -119,7 +119,7 @@ async function A(a, e) {
     headers: new Headers(s.headers),
     status: s.status,
     statusText: s.statusText
-  }, i = W() ? s.body : await s.blob();
+  }, i = A() ? s.body : await s.blob();
   return new Response(i, r);
 }
 const D = (a) => new URL(String(a), location.href).href.replace(new RegExp(`^${location.origin}`), "");
@@ -693,7 +693,7 @@ d.defaultPrecacheCacheabilityPlugin = {
 };
 d.copyRedirectedCacheableResponsesPlugin = {
   async cacheWillUpdate({ response: a }) {
-    return a.redirected ? await A(a) : a;
+    return a.redirected ? await W(a) : a;
   }
 };
 class G {
@@ -894,12 +894,12 @@ This is generally NOT safe. Learn more at https://bit.ly/wb-precache`;
   }
 }
 let U;
-const K = () => (U || (U = new G()), U);
+const v = () => (U || (U = new G()), U);
 try {
   self["workbox:routing:7.3.0"] && _();
 } catch {
 }
-const v = "GET", R = (a) => a && typeof a == "object" ? a : { handle: a };
+const K = "GET", R = (a) => a && typeof a == "object" ? a : { handle: a };
 class w {
   /**
    * Constructor for Route class.
@@ -912,7 +912,7 @@ class w {
    * @param {string} [method='GET'] The HTTP method to match the Route
    * against.
    */
-  constructor(e, t, s = v) {
+  constructor(e, t, s = K) {
     this.handler = R(t), this.match = e, this.method = s;
   }
   /**
@@ -1091,7 +1091,7 @@ class Q {
    * @param {string} [method='GET'] The HTTP method to associate with this
    * default handler. Each method has its own default.
    */
-  setDefaultHandler(e, t = v) {
+  setDefaultHandler(e, t = K) {
     this._defaultHandlerMap.set(t, R(e));
   }
   /**
@@ -1205,7 +1205,7 @@ class Z extends w {
   }
 }
 function ee(a) {
-  const e = K(), t = new Z(e, a);
+  const e = v(), t = new Z(e, a);
   J(t);
 }
 const te = "-precache-", se = async (a, e = te) => {
@@ -1220,41 +1220,47 @@ function ae() {
   });
 }
 function ne(a) {
-  K().precache(a);
+  v().precache(a);
 }
 function re(a, e) {
   ne(a), ee(e);
 }
-re([{"revision":"e29a9fc8384f741309eb3962ba81c71e","url":"registerSW.js"},{"revision":"a6b2691f70d1eb25485a3d09f4eeeed1","url":"index.html"},{"revision":null,"url":"assets/index-WOEGzoeu.js"},{"revision":null,"url":"assets/index-BaxYSOBN.css"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"icon.svg"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"apple-touch-icon.svg"},{"revision":"5df1c94f897199cabb3fe5be4f0ef6fa","url":"manifest.webmanifest"}]);
+re([{"revision":"e29a9fc8384f741309eb3962ba81c71e","url":"registerSW.js"},{"revision":"dce6787deafadadfe1f928c6eb5d331e","url":"index.html"},{"revision":null,"url":"assets/index-MI0ZiwAk.js"},{"revision":null,"url":"assets/index-CocDCa7a.css"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"icon.svg"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"apple-touch-icon.svg"},{"revision":"5df1c94f897199cabb3fe5be4f0ef6fa","url":"manifest.webmanifest"}]);
 ae();
 self.addEventListener("push", (a) => {
-  var n, r;
+  var r, i, c;
   let e = {};
   try {
-    e = ((n = a.data) == null ? void 0 : n.json()) ?? {};
+    e = ((r = a.data) == null ? void 0 : r.json()) ?? {};
   } catch {
-    e = { body: ((r = a.data) == null ? void 0 : r.text()) ?? "" };
+    e = { body: ((i = a.data) == null ? void 0 : i.text()) ?? "" };
   }
   const t = e.title ?? "New letter in Loremail", s = {
     body: e.body ?? "A new letter has arrived. Open Loremail to read it.",
     icon: "/LoreMail/icon.svg",
     badge: "/LoreMail/icon.svg",
     tag: "loremail-letter",
-    // collapse multiple rapid notifications
     renotify: !0,
     data: { url: e.url ?? "/LoreMail/" }
-  };
-  a.waitUntil(self.registration.showNotification(t, s));
+  }, n = (c = self.navigator) != null && c.setAppBadge ? self.navigator.setAppBadge(1).catch(() => {
+  }) : Promise.resolve();
+  a.waitUntil(
+    Promise.all([
+      self.registration.showNotification(t, s),
+      n
+    ])
+  );
 });
 self.addEventListener("notificationclick", (a) => {
-  var t;
+  var t, s;
   a.notification.close();
   const e = ((t = a.notification.data) == null ? void 0 : t.url) ?? "/LoreMail/";
-  a.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: !0 }).then((s) => {
-      for (const n of s)
-        if (n.url.includes("/LoreMail") && "focus" in n)
-          return n.focus();
+  (s = self.navigator) != null && s.clearAppBadge && self.navigator.clearAppBadge().catch(() => {
+  }), a.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: !0 }).then((n) => {
+      for (const r of n)
+        if (r.url.includes("/LoreMail") && "focus" in r)
+          return r.focus();
       if (clients.openWindow) return clients.openWindow(e);
     })
   );
