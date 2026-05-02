@@ -71,7 +71,7 @@ export default function App() {
   const { data, loading, refresh, patchData } = useGameData(session);
 
   // Register push notifications once the player has a session
-  usePushNotifications(session);
+  const { pushStatus, pushError, retrySubscribe } = usePushNotifications(session);
 
    // Poll on focus
    useEffect(() => {
@@ -232,6 +232,30 @@ export default function App() {
           <button className={tab === 'control' ? 'active' : ''} onClick={() => setTab('control')}>⚙ Control</button>
         )}
       </nav>
+
+      {/* Push notification status banner */}
+      {pushStatus === 'denied' && (
+        <div className="push-banner push-banner--warn">
+          🔕 Notifications blocked. Enable them in browser settings, then{' '}
+          <button className="push-banner-btn" onClick={retrySubscribe}>retry</button>.
+        </div>
+      )}
+      {pushStatus === 'unsupported' && (
+        <div className="push-banner push-banner--warn">
+          🔕 Push notifications aren't supported in this browser.
+        </div>
+      )}
+      {pushStatus === 'error' && (
+        <div className="push-banner push-banner--warn">
+          🔔 Notifications failed: {pushError}.{' '}
+          <button className="push-banner-btn" onClick={retrySubscribe}>retry</button>
+        </div>
+      )}
+      {pushStatus === 'idle' && (
+        <div className="push-banner push-banner--info">
+          🔔 <button className="push-banner-btn" onClick={retrySubscribe}>Enable notifications</button>
+        </div>
+      )}
 
       <div className="screen-content">
          {tab === 'letters' && (

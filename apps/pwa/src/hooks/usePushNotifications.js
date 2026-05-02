@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL ?? 'https://loremail-worker.amix.workers.dev';
 
@@ -18,61 +18,102 @@ function urlBase64ToUint8Array(base64url) {
 /**
  * usePushNotifications
  *
- * Registers the service worker, requests push permission, subscribes to
- * the browser's push service, and sends the subscription to the Loremail
- * Worker so it can fire notifications when new letters arrive.
+ * Returns { pushStatus, pushError, retrySubscribe } so the UI can show
+ * status and offer a manual enable button.
  *
- * Called once after the player has a session.  Silently no-ops if:
- *  - The browser doesn't support service workers / Push API
- *  - The user denies notification permission
- *  - VAPID keys aren't configured on the server
+ * pushStatus values:
+ *   'idle'        — not yet attempted
+ *   'subscribed'  — fully registered with server
+ *   'denied'      — user denied notification permission
+ *   'unsupported' — browser / platform doesn't support push
+ *   'error'       — something failed (see pushError)
  */
 export function usePushNotifications(session) {
-  // Prevent double-subscribing in StrictMode / multiple renders
   const subscribedRef = useRef(false);
+  const [pushStatus, setPushStatus] = useState('idle');
+  const [pushError, setPushError] = useState(null);
 
   const subscribe = useCallback(async () => {
     if (subscribedRef.current) return;
-    if (!session?.gameId || !session?.playerId) return;
+    if (!session?.gameId || !session?.playerId) {
+      console.log('[Push] No session yet, skipping');
+      return;
+    }
 
     // Feature detection
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    if (!('Notification' in window)) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.warn('[Push] serviceWorker or PushManager not supported');
+      setPushStatus('unsupported');
+      return;
+    }
+    if (!('Notification' in window)) {
+      console.warn('[Push] Notification API not supported');
+      setPushStatus('unsupported');
+      return;
+    }
 
-    // Don't pester users who already denied
-    if (Notification.permission === 'denied') return;
+    if (Notification.permission === 'denied') {
+      console.warn('[Push] Notification permission is denied');
+      setPushStatus('denied');
+      return;
+    }
 
     try {
-      // Wait for the service worker to be ready
+      console.log('[Push] Waiting for service worker to be ready...');
       const registration = await navigator.serviceWorker.ready;
+      console.log('[Push] Service worker ready:', registration.scope);
 
-      // Fetch the VAPID public key from the Worker
+      console.log('[Push] Fetching VAPID public key...');
       const keyRes = await fetch(`${WORKER_URL}/push/vapid-key`);
-      if (!keyRes.ok) return; // VAPID not configured — fail silently
+      if (!keyRes.ok) {
+        const msg = `VAPID key fetch failed: ${keyRes.status}`;
+        console.warn('[Push]', msg);
+        setPushStatus('error');
+        setPushError(msg);
+        return;
+      }
 
       const { publicKey } = await keyRes.json();
-      if (!publicKey) return;
+      if (!publicKey) {
+        const msg = 'No publicKey in VAPID response';
+        console.warn('[Push]', msg);
+        setPushStatus('error');
+        setPushError(msg);
+        return;
+      }
+      console.log('[Push] Got VAPID key ✓');
 
-      // Check if we already have a valid subscription
       let subscription = await registration.pushManager.getSubscription();
+      console.log('[Push] Existing subscription:', subscription ? 'yes' : 'none');
 
       if (!subscription) {
-        // Ask for permission first (required on iOS)
+        console.log('[Push] Requesting notification permission...');
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        console.log('[Push] Permission result:', permission);
+        if (permission !== 'granted') {
+          setPushStatus('denied');
+          return;
+        }
 
-        // Subscribe
+        console.log('[Push] Subscribing to push service...');
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
+        console.log('[Push] Push subscription created ✓');
       }
 
-      if (!subscription) return;
+      if (!subscription) {
+        const msg = 'pushManager.subscribe returned null';
+        console.warn('[Push]', msg);
+        setPushStatus('error');
+        setPushError(msg);
+        return;
+      }
 
-      // Register the subscription with our Worker
+      console.log('[Push] Registering subscription with Worker...');
       const subJson = subscription.toJSON();
-      await fetch(`${WORKER_URL}/push/subscribe`, {
+      const res = await fetch(`${WORKER_URL}/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,17 +123,37 @@ export function usePushNotifications(session) {
         }),
       });
 
+      if (!res.ok) {
+        const msg = `Worker subscribe failed: ${res.status}`;
+        console.warn('[Push]', msg);
+        setPushStatus('error');
+        setPushError(msg);
+        return;
+      }
+
       subscribedRef.current = true;
-      console.log('[LoreMail] Push notifications subscribed ✓');
+      setPushStatus('subscribed');
+      setPushError(null);
+      console.log('[Push] Push notifications subscribed ✓');
     } catch (e) {
-      // Non-fatal — the app works fine without notifications
-      console.warn('[LoreMail] Push subscription failed:', e.message);
+      console.warn('[Push] Push subscription failed:', e.message, e);
+      setPushStatus('error');
+      setPushError(e.message);
     }
   }, [session]);
 
+  // Manual retry — also resets the subscribed guard so it can re-run
+  const retrySubscribe = useCallback(() => {
+    subscribedRef.current = false;
+    setPushStatus('idle');
+    setPushError(null);
+    subscribe();
+  }, [subscribe]);
+
   useEffect(() => {
-    // Small delay so it doesn't race the service worker installation
     const id = setTimeout(subscribe, 2000);
     return () => clearTimeout(id);
   }, [subscribe]);
+
+  return { pushStatus, pushError, retrySubscribe };
 }
