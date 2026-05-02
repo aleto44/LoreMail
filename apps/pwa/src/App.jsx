@@ -20,6 +20,41 @@ export default function App() {
   const [readingLetter, setReadingLetter] = useState(null);
   const [showChronicle, setShowChronicle] = useState(false);
 
+  // Handle Android back button
+  useEffect(() => {
+    // Push initial state if not already present
+    if (!window.history.state) {
+      window.history.replaceState({ view: 'main' }, '');
+    }
+
+    const handlePopState = (e) => {
+      const state = e.state || { view: 'main' };
+      
+      // Restore state based on what was pushed
+      if (state.view === 'reading') {
+        setReadingLetter(state.letter || null);
+        setComposing(false);
+        setShowChronicle(false);
+      } else if (state.view === 'chronicle') {
+        setShowChronicle(true);
+        setComposing(false);
+        setReadingLetter(null);
+      } else if (state.view === 'composing') {
+        setComposing(true);
+        setReadingLetter(null);
+        setShowChronicle(false);
+      } else {
+        // Default: return to main view
+        setComposing(false);
+        setReadingLetter(null);
+        setShowChronicle(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Remaining post-join refresh attempts (counts down to 0)
   const [joinPollsLeft, setJoinPollsLeft] = useState(0);
 
@@ -38,12 +73,24 @@ export default function App() {
   // Register push notifications once the player has a session
   usePushNotifications(session);
 
-  // Poll on focus
-  useEffect(() => {
-    const onFocus = () => refresh();
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [refresh]);
+   // Poll on focus
+   useEffect(() => {
+     const onFocus = () => refresh();
+     window.addEventListener('focus', onFocus);
+     return () => window.removeEventListener('focus', onFocus);
+   }, [refresh]);
+
+   // Wrapper for opening letters to push history
+   const handleReadLetter = useCallback((letter) => {
+     setReadingLetter(letter);
+     window.history.pushState({ view: 'reading', letter }, '');
+   }, []);
+
+   // Wrapper for opening chronicle to push history
+   const handleShowChronicle = useCallback(() => {
+     setShowChronicle(true);
+     window.history.pushState({ view: 'chronicle' }, '');
+   }, []);
 
   // ── Post-join smart polling ───────────────────────────────
   // After a player joins, retry every 3 s until their first letter appears
@@ -94,27 +141,31 @@ export default function App() {
   // ── Compose overlay ──────────────────────────────────────
   if (composing) {
     return (
-      <ComposeScreen
-        session={session}
-        data={data}
-        onSent={(newLetter) => {
-          // Optimistically inject the sent letter into the pending list so
-          // "In Transit" appears instantly without any network round-trip.
-          if (newLetter) {
-            patchData(d => ({
-              ...d,
-              pendingLetters: [...(d?.pendingLetters ?? []), newLetter],
-            }));
-          }
-          setComposing(false);
-          // Do NOT call refresh() here — GitHub's API can lag a few hundred ms
-          // after a successful commit, so an immediate read would race and
-          // overwrite the optimistic state with stale data.
-          // The focus-event listener in useEffect will sync when the user next
-          // switches away and back, by which point GitHub is fully consistent.
-        }}
-        onCancel={() => setComposing(false)}
-      />
+       <ComposeScreen
+         session={session}
+         data={data}
+         onSent={(newLetter) => {
+           // Optimistically inject the sent letter into the pending list so
+           // "In Transit" appears instantly without any network round-trip.
+           if (newLetter) {
+             patchData(d => ({
+               ...d,
+               pendingLetters: [...(d?.pendingLetters ?? []), newLetter],
+             }));
+           }
+           setComposing(false);
+           window.history.back();
+           // Do NOT call refresh() here — GitHub's API can lag a few hundred ms
+           // after a successful commit, so an immediate read would race and
+           // overwrite the optimistic state with stale data.
+           // The focus-event listener in useEffect will sync when the user next
+           // switches away and back, by which point GitHub is fully consistent.
+         }}
+         onCancel={() => {
+           setComposing(false);
+           window.history.back();
+         }}
+       />
     );
   }
 
@@ -124,42 +175,48 @@ export default function App() {
       data?.characters?.[readingLetter.from]?.name ?? readingLetter.from;
     const isSent = readingLetter.from === session.playerId;
     return (
-      <div className="app-shell">
-        <div className="screen-content">
-          <div className="letter-view">
-            <button className="letter-back" onClick={() => setReadingLetter(null)}>←</button>
-            <div className="letter-paper">
-              {isSent && (
-                <div className="letter-meta-header">
-                  to {data?.characters?.[readingLetter.to]?.name ?? readingLetter.to}
-                </div>
-              )}
-              <div>{readingLetter.body}</div>
-              <div className="letter-signature">{senderName}</div>
-            </div>
-            <div className="letter-arrived">{readingLetter.arrivedLabel}</div>
-          </div>
-        </div>
-      </div>
+       <div className="app-shell">
+         <div className="screen-content">
+           <div className="letter-view">
+             <button className="letter-back" onClick={() => {
+               setReadingLetter(null);
+               window.history.back();
+             }}>←</button>
+             <div className="letter-paper">
+               {isSent && (
+                 <div className="letter-meta-header">
+                   to {data?.characters?.[readingLetter.to]?.name ?? readingLetter.to}
+                 </div>
+               )}
+               <div>{readingLetter.body}</div>
+               <div className="letter-signature">{senderName}</div>
+             </div>
+             <div className="letter-arrived">{readingLetter.arrivedLabel}</div>
+           </div>
+         </div>
+       </div>
     );
   }
 
   // ── Chronicle view ────────────────────────────────────────
   if (showChronicle && data?.chronicle) {
     return (
-      <div className="app-shell">
-        <div className="screen-content">
-          <div className="chronicle-view">
-            <button className="letter-back" style={{ marginBottom: 24 }} onClick={() => setShowChronicle(false)}>←</button>
-            <div className="chronicle-title">{data.game?.name?.toUpperCase()}</div>
-            <div className="chronicle-subtitle">A Chronicle</div>
-            <hr className="chronicle-divider" />
-            <div className="chronicle-body">{data.chronicle}</div>
-            <hr className="chronicle-divider" />
-            <div className="loremail-mark">L O R E M A I L</div>
-          </div>
-        </div>
-      </div>
+       <div className="app-shell">
+         <div className="screen-content">
+           <div className="chronicle-view">
+             <button className="letter-back" style={{ marginBottom: 24 }} onClick={() => {
+               setShowChronicle(false);
+               window.history.back();
+             }}>←</button>
+             <div className="chronicle-title">{data.game?.name?.toUpperCase()}</div>
+             <div className="chronicle-subtitle">A Chronicle</div>
+             <hr className="chronicle-divider" />
+             <div className="chronicle-body">{data.chronicle}</div>
+             <hr className="chronicle-divider" />
+             <div className="loremail-mark">L O R E M A I L</div>
+           </div>
+         </div>
+       </div>
     );
   }
 
@@ -177,14 +234,14 @@ export default function App() {
       </nav>
 
       <div className="screen-content">
-        {tab === 'letters' && (
-          <LettersScreen
-            session={session}
-            data={data}
-            loading={loading}
-            onReadLetter={setReadingLetter}
-          />
-        )}
+         {tab === 'letters' && (
+           <LettersScreen
+             session={session}
+             data={data}
+             loading={loading}
+             onReadLetter={handleReadLetter}
+           />
+         )}
         {tab === 'world' && (
           <WorldScreen
             data={data}
@@ -195,20 +252,23 @@ export default function App() {
             onRefresh={refresh}
           />
         )}
-        {tab === 'control' && session.isFounder && (
-          <ControlPanel
-            session={session}
-            data={data}
-            workerUrl={WORKER_URL}
-            onRefresh={refresh}
-            onChronicle={() => setShowChronicle(true)}
-          />
-        )}
+         {tab === 'control' && session.isFounder && (
+           <ControlPanel
+             session={session}
+             data={data}
+             workerUrl={WORKER_URL}
+             onRefresh={refresh}
+             onChronicle={handleShowChronicle}
+           />
+         )}
       </div>
 
-      {tab === 'letters' && (
-        <button className="fab" onClick={() => setComposing(true)} title="Compose">✦</button>
-      )}
+       {tab === 'letters' && (
+         <button className="fab" onClick={() => {
+           setComposing(true);
+           window.history.pushState({ view: 'composing' }, '');
+         }} title="Compose">✦</button>
+       )}
     </div>
   );
 }
