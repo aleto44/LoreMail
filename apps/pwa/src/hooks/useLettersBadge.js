@@ -5,43 +5,56 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  *
  * Tracks unread delivered letters and keeps the PWA app-icon badge in sync.
  *
- * Storage key: `last_seen_letters_<gameId>` — unix timestamp written when
- * markLettersSeen() is called.
+ * Storage keys (both scoped to gameId):
+ *   last_seen_letters_<gameId>  — unix timestamp; updated by markLettersSeen()
+ *   read_letters_<gameId>       — JSON array of letter IDs the user has opened;
+ *                                 lets us remove highlights one-by-one and
+ *                                 survive page refreshes without re-showing
+ *                                 already-read letters.
  *
  * Returns:
- *   unreadCount     — drops to 0 when markLettersSeen() is called (state-driven)
- *   newLetters      — frozen at first data load; used for per-letter highlights
- *                     and is NOT wiped by markLettersSeen()
- *   markLettersSeen — call this when the user has actually opened the Letters tab
+ *   unreadCount     — reactive count; drops as letters are read / all marked seen
+ *   newLetters      — reactive array; shrinks as individual letters are read
+ *   markLetterRead  — call with a letter id when the user opens that letter
+ *   markLettersSeen — call to bulk-clear all new letters (e.g. announcement "Open")
  */
 export function useLettersBadge(session, deliveredLetters) {
   const gameId   = session?.gameId;
   const playerId = session?.playerId;
-  const key = gameId ? `last_seen_letters_${gameId}` : null;
+  const seenKey = gameId ? `last_seen_letters_${gameId}` : null;
+  const readKey = gameId ? `read_letters_${gameId}` : null;
 
-  // Read once at mount and freeze — determines which letters were "new" on entry
-  const lastSeenAtMount = useRef(
-    key ? (parseInt(localStorage.getItem(key) ?? '0', 10) || 0) : 0,
+  // Coarse "seen" timestamp — read from localStorage once at mount.
+  // Updated (in-memory + localStorage) by markLettersSeen().
+  const lastSeenRef = useRef(
+    seenKey ? (parseInt(localStorage.getItem(seenKey) ?? '0', 10) || 0) : 0,
   );
 
-  // newLetters: frozen at the first render that has deliveredLetters.
-  // Subsequent markLettersSeen() calls do NOT affect this — highlights persist
-  // until the user reloads / re-mounts.
-  const newLettersFrozenRef = useRef(null);
-  if (newLettersFrozenRef.current === null && deliveredLetters != null) {
-    newLettersFrozenRef.current = deliveredLetters.filter(
-      l => l.to === playerId && l.deliverAt > lastSeenAtMount.current,
-    );
-  }
-  const newLetters = newLettersFrozenRef.current ?? [];
+  // Fine-grained per-letter read IDs — persisted so highlights don't
+  // reappear after a page refresh.
+  const [readIds, setReadIds] = useState(() => {
+    if (!readKey) return new Set();
+    try {
+      const stored = JSON.parse(localStorage.getItem(readKey) ?? '[]');
+      return new Set(Array.isArray(stored) ? stored : []);
+    } catch {
+      return new Set();
+    }
+  });
 
-  // seen: becomes true when markLettersSeen() is called.
-  // unreadCount is derived from it so a single setState zeroes the badge
-  // without mutating the frozen newLetters array.
-  const [seen, setSeen] = useState(false);
-  const unreadCount = seen ? 0 : newLetters.length;
+  // newLetters: letters delivered after lastSeen that haven't been read yet.
+  // Reactive — shrinks one-by-one as markLetterRead() is called.
+  const newLetters = deliveredLetters
+    ? deliveredLetters.filter(
+        l => l.to === playerId &&
+             l.deliverAt > lastSeenRef.current &&
+             !readIds.has(l.id),
+      )
+    : [];
 
-  // Keep the app-icon badge in sync whenever unread count changes
+  const unreadCount = newLetters.length;
+
+  // Keep the app-icon badge in sync
   useEffect(() => {
     if (!('setAppBadge' in navigator)) return;
     if (unreadCount > 0) {
@@ -51,15 +64,32 @@ export function useLettersBadge(session, deliveredLetters) {
     }
   }, [unreadCount]);
 
+  // Mark a single letter as read — removes its highlight immediately and
+  // persists the decision so it survives a refresh.
+  const markLetterRead = useCallback((letterId) => {
+    if (!readKey || !letterId) return;
+    setReadIds(prev => {
+      if (prev.has(letterId)) return prev; // already read, no-op
+      const next = new Set(prev);
+      next.add(letterId);
+      localStorage.setItem(readKey, JSON.stringify([...next]));
+      return next;
+    });
+  }, [readKey]);
+
+  // Bulk-clear: advance the coarse timestamp to "now" and wipe the individual
+  // read set (no longer needed once all letters are behind the new watermark).
   const markLettersSeen = useCallback(() => {
-    if (!key) return;
+    if (!seenKey) return;
     const now = Math.floor(Date.now() / 1000);
-    localStorage.setItem(key, String(now));
-    setSeen(true);
+    localStorage.setItem(seenKey, String(now));
+    lastSeenRef.current = now;
+    if (readKey) localStorage.removeItem(readKey);
+    setReadIds(new Set());
     if ('clearAppBadge' in navigator) {
       navigator.clearAppBadge().catch(() => {});
     }
-  }, [key]);
+  }, [seenKey, readKey]);
 
-  return { unreadCount, newLetters, markLettersSeen };
+  return { unreadCount, newLetters, markLetterRead, markLettersSeen };
 }

@@ -102,7 +102,7 @@ export default function App() {
   const { data, loading, refresh, patchData } = useGameData(session);
 
   // Unread-letter badge (app icon + tab indicator)
-  const { unreadCount, newLetters, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters);
+  const { unreadCount, newLetters, markLetterRead, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters);
 
   // ── New-letter announcement ───────────────────────────────
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
@@ -163,9 +163,10 @@ export default function App() {
 
    // Wrapper for opening letters to push history
    const handleReadLetter = useCallback((letter) => {
+     markLetterRead(letter?.id);
      setReadingLetter(letter);
      window.history.pushState({ view: 'reading', letter }, '');
-   }, []);
+   }, [markLetterRead]);
 
    // Wrapper for opening chronicle to push history
    const handleShowChronicle = useCallback(() => {
