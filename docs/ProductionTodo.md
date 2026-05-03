@@ -50,7 +50,7 @@ The PWA is a Vite + React SPA with **no client-side router** (navigation is stat
 1. **Set the base path** in `apps/pwa/vite.config.js`:
 
    ```js
-   base: '/loremail/',   // or '/' if deploying to a custom domain
+   base: '/loremail/'   // or '/' if deploying to a custom domain
    ```
 
 2. **Set the worker URL** at build time. In `apps/pwa/.env.production`:
@@ -105,7 +105,7 @@ The PWA URL will be `https://<your-github-username>.github.io/loremail/` (or `/`
 1. **Set the base path** in `apps/launcher/vite.config.js`:
 
    ```js
-   base: '/launch/',
+   base: '/launch/'
    ```
 
 2. **Set the worker URL** in `apps/launcher/.env.production`:
