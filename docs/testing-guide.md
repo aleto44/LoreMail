@@ -115,7 +115,7 @@ mkdir -p /tmp/test-game/{world,players/alice,letters/pending,letters/delivered,c
 # 2. Create minimal game files
 echo '{"name":"Test World","flavour":"a test setting","era":"medieval","tone":"mysterious","gm_style":"medium","gm_paused":false,"model":"gpt-4o","founder_id":"alice","players":[{"id":"alice","character":"Test Alice","joined":true,"is_founder":true}],"default_travel_hours":1}' \
   > /tmp/test-game/config/game.json
-echo '{"canon_recent_word_limit":4000,"canon_deep_summary_target":800,"temperature":0.4,"consistency_check":false,"fact_extraction":false,"locked_tag":"[LOCKED]","developing_tag":"[DEVELOPING]"}' \
+echo '{"canon_recent_word_limit":4000,"canon_deep_summary_target":800,"temperature":0.4,"consistency_check":false,"fact_extraction":false}' \
   > /tmp/test-game/config/engine.json
 printf "## DEEP HISTORY\n\n## RECENT HISTORY\n" > /tmp/test-game/world/canon.md
 echo "" > /tmp/test-game/world/events.md

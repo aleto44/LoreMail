@@ -43,7 +43,7 @@ await engine.summarizeIfNeeded();
 
 1. **Append-only architecture** — enforced in code, not just prompts
 2. **Low temperature** — 0.4 for GM runs, 0.2 for compression
-3. **Locked / Developing tags** — LOCKED entries are never contradicted
+3. **Append-only canon** — entries are never revised or deleted
 4. **Fact extraction** — concrete facts fed as hard constraints to every run
 
 ## Context Window Strategy

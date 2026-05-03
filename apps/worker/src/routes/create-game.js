@@ -100,8 +100,6 @@ export async function handleCreateGame(request, env) {
     consistency_check: true,
     fact_extraction: true,
     events_window: 20,
-    locked_tag: '[LOCKED]',
-    developing_tag: '[DEVELOPING]',
   };
 
   const files = buildGameScaffold({
