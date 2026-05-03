@@ -7,6 +7,7 @@
  *   letter_delivery  — default, checks pending letters
  *   seed_generation  — generates world seed on game creation
  *   finalization     — generates chronicle.md
+ *   chapterize       — summarizes current canon into a numbered chapter
  */
 import { GMEngine } from '../engine/index.js';
 import path from 'path';
@@ -74,6 +75,18 @@ async function main() {
     return;
   }
 
+  if (TRIGGER === 'chapterize') {
+    console.log('Chapterizing current canon entries...');
+    const result = await engine.processChapterize({ game: gameJson });
+    if (result.success) {
+      console.log(`Chapter ${result.chapter.number} created: "${result.chapter.title}"`);
+      await engine.writeStatus({ trigger: 'chapterize', lettersProcessed: 0, success: true });
+    } else {
+      console.log(`Chapterize skipped: ${result.reason}`);
+      await engine.writeStatus({ trigger: 'chapterize', lettersProcessed: 0, success: false, error: result.reason });
+    }
+    return;
+  }
   // Default: letter_delivery
   const now = Math.floor(Date.now() / 1000);
   const pendingLetters = await ws.listPendingLetters();

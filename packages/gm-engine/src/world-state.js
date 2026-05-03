@@ -197,6 +197,7 @@ export class WorldState {
     'world/people.json':   { people: [] },
     'world/factions.json': { factions: [] },
     'world/timeline.json': { entries: [] },
+    'world/chapters.json':  { chapters: [] },
   };
 
   async readWorldJson(relPath) {
@@ -282,7 +283,16 @@ export class WorldState {
     await this.writeWorldJson('world/timeline.json', data);
   }
 
-  /** Record which map node a player character is currently at. */
+  // ─── Chapters JSON ───────────────────────────────────────────────────────
+  async readChaptersJson() {
+    return await this.readWorldJson('world/chapters.json');
+  }
+  async appendChapterJson(chapter) {
+    const data = await this.readChaptersJson();
+    data.chapters.push(chapter);
+    await this.writeWorldJson('world/chapters.json', data);
+  }
+    /** Record which map node a player character is currently at. */
   async updatePlayerLocationOnMap(playerId, nodeId) {
     const map = await this.readWorldJson('world/map.json');
     if (!map.player_locations) map.player_locations = {};

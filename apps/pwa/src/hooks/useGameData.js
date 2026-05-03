@@ -108,6 +108,7 @@ async function fetchGameData(session) {
     peopleRaw,
     factionsRaw,
     timelineRaw,
+    chaptersRaw,
   ] = await Promise.all([
     getContent('config/game.json'),
     getContent('config/engine.json'),
@@ -124,6 +125,7 @@ async function fetchGameData(session) {
     worldGet('people.json'),
     worldGet('factions.json'),
     worldGet('timeline.json'),
+    worldGet('chapters.json'),
   ]);
 
   const game = gameJsonRaw ? JSON.parse(gameJsonRaw) : null;
@@ -229,6 +231,7 @@ async function fetchGameData(session) {
     worldPeople:   peopleRaw   ? JSON.parse(peopleRaw)   : { people: [] },
     worldFactions: factionsRaw ? JSON.parse(factionsRaw) : { factions: [] },
     worldTimeline: timelineRaw ? JSON.parse(timelineRaw) : { entries: [] },
+    worldChapters: chaptersRaw ? JSON.parse(chaptersRaw) : { chapters: [] },
   };
 }
 

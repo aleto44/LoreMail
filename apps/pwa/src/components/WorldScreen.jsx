@@ -447,6 +447,7 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
 
   const canon          = data?.canon ?? '';
   const events         = data?.events ?? '';
+  const worldChapters  = data?.worldChapters ?? { chapters: [] };
   const characters     = data?.characters ?? {};
   const seed           = data?.seed ?? '';
   const seedGenerating = data?.seedGenerating ?? false;
@@ -534,9 +535,27 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
             </div>
           ) : null}
 
-          <div className="world-prose" style={{ marginTop: seedGenerating ? 20 : 0 }}>
-            <ReactMarkdown>{stripMeta(recentHistory) || '*The world is quiet. No history has been recorded yet.*'}</ReactMarkdown>
-          </div>
+          {/* Current (unchapterized) canon entries */}
+          {recentHistory ? (
+            <div className="world-prose" style={{ marginTop: seedGenerating ? 20 : 0 }}>
+              <ReactMarkdown>{stripMeta(recentHistory)}</ReactMarkdown>
+            </div>
+          ) : !seedGenerating && (worldChapters.chapters ?? []).length === 0 ? (
+            <div className="world-prose" style={{ marginTop: seedGenerating ? 20 : 0 }}>
+              <ReactMarkdown>*The world is quiet. No history has been recorded yet.*</ReactMarkdown>
+            </div>
+          ) : null}
+
+          {/* Chapters — newest first */}
+          {[...(worldChapters.chapters ?? [])].reverse().map(ch => (
+            <div key={ch.number} className="chapter-card">
+              <div className="chapter-card-header">
+                <span className="chapter-card-number">Chapter {ch.number}</span>
+                <span className="chapter-card-title">{ch.title}</span>
+              </div>
+              <div className="chapter-card-summary">{ch.summary}</div>
+            </div>
+          ))}
 
           {eventLines && (
             <div className="world-events">

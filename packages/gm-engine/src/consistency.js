@@ -63,7 +63,7 @@ Respond with JSON only:
 Rewrite the entry so that both the existing facts and the new information are simultaneously true.
 Find the most dramatically interesting reconciliation.
 Do not reject or omit the new information — recontextualise it.
-Output only the rewritten entry. Same format as the original (### [DEVELOPING] heading etc).
+Output only the rewritten entry. Same format as the original (### heading etc).
 No preamble.`,
       },
       {

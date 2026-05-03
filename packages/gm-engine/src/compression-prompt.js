@@ -24,7 +24,7 @@ Rules:
 
     // Extract titles and dates from entries for the output skeleton
     const titles = chunk.map(e => {
-      const titleMatch = e.match(/### \[(?:DEVELOPING|LOCKED)\] (.+)/);
+      const titleMatch = e.match(/### (.+)/);
       return titleMatch ? titleMatch[1].trim() : 'Untitled';
     });
 

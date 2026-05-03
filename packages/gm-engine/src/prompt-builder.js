@@ -32,8 +32,8 @@ Starting location: ${founderCharacter?.location ?? 'Unknown'}
 
 Produce:
 1. seed — 250–300 word world introduction. Third person, past tense, chronicle voice. Set scene, era, atmosphere, central tension. Do not resolve anything. End with the world in motion.
-2. first_canon_entry — one [DEVELOPING] entry, 80–120 words.
-   Format exactly: ### [DEVELOPING] {Short title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
+2. first_canon_entry — one canon entry, 80–120 words.
+   Format exactly: ### {Short title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
 3. map_updates — seed the world map with the founder's starting location as the first node.
    Use a stable lowercase hyphenated id. e.g. "crull-waystation". No edges yet unless the
    starting location is a sub-area of a larger settlement (e.g. "Kingsland Outskirts" → also add
@@ -97,8 +97,8 @@ Respond ONLY with a single JSON object:
   "player_location_node_id": string
 }
 
-canon_addition: A brief [DEVELOPING] entry (60–100 words) establishing this character's presence in the world.
-  Format: ### [DEVELOPING] {title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
+canon_addition: A brief canon entry (60–100 words) establishing this character's presence in the world.
+  Format: ### {title}\\n*established: ${today} · source: gm-inference*\\n\\n{prose body}
   null if no canon entry is warranted.
 world_event: One past-tense sentence recording this character's arrival. Or null.
 gm_notes_addition: Your private notes on this character and how they fit the world. Always populate.
@@ -176,9 +176,8 @@ CANON RULES
 Canon is append-only. You add to it. You never revise it.
 Every fact you establish becomes permanent. Write nothing you would need to undo.
 
-Entries tagged [LOCKED] are immutable. Build on them. Never contradict them.
-Entries tagged [DEVELOPING] may be expanded, reinterpreted, or resolved — never erased.
-All new entries you produce are implicitly [DEVELOPING] unless the world has clearly settled the matter.
+All entries are equal — the most recent facts are considered current.
+Older entries remain visible and may be built upon, but never erased or contradicted.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CONTRADICTION HANDLING
@@ -283,7 +282,7 @@ Field rules:
 
 canon_addition
   A new entry for canon.md. Written in chronicle voice. 80–150 words.
-  Begins with a heading: ### [DEVELOPING] {Short title of what is being established}
+  Begins with a heading: ### {Short title of what is being established}
   Followed by: *established: ${today} · source: gm-inference*
   Then the entry body. No bullet points. Flowing prose. Spare and precise.
   null if this letter warrants no canon change.
@@ -378,10 +377,33 @@ not. The world is neither hostile nor kind. It simply remembers.`;
     blocks.push(`Now produce your JSON response. Remember:
 - No preamble, no explanation, no markdown fences.
 - Raw JSON only.
-- canon_addition must begin with the ### [DEVELOPING] heading format if not null.
+- canon_addition must begin with the ### heading format (### {Short title}) if not null.
 - gm_notes_addition is always populated.
 - next_letter_travel_hours is always an integer ≥ 1.`);
 
     return blocks.join('\n\n---\n\n');
+  }
+
+  buildChapterizePrompt({ seed, facts, canonEntries, chapterNumber, game }) {
+    const system = `You are a historian writing chapter summaries for a living epistolary world.
+Third person, past tense, measured and authoritative.
+Write as if recording a defined period of history that has now closed.
+Your summary should be readable by players who want to catch up on the story so far.
+Your only output is a JSON object. No preamble, no markdown fences.`;
+    const blocks = [];
+    if (seed?.trim()) blocks.push(`WORLD SEED\n──────────\n${seed}`);
+    if (facts?.trim()) blocks.push(`ESTABLISHED FACTS\n─────────────────\n${facts}`);
+    blocks.push(`CANON ENTRIES TO SUMMARIZE INTO CHAPTER ${chapterNumber}\n${'─'.repeat(52)}\n${canonEntries}`);
+    blocks.push(`Write Chapter ${chapterNumber} of the world chronicle.
+Produce a short title (3–6 words) and a summary paragraph (3–5 sentences) that captures the essential events, turning points, and consequences of this period. Write for players — make it engaging and informative. Chronicle voice: third person, past tense, spare and precise.
+Respond with JSON only:
+{
+  "chapter_title": string,
+  "chapter_summary": string
+}`);
+    return [
+      { role: 'system', content: system },
+      { role: 'user', content: blocks.join('\n\n---\n\n') },
+    ];
   }
 }

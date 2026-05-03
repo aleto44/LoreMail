@@ -119,7 +119,7 @@ export class GMEngine {
       canonAdditionToWrite = check.resolvedAddition;
     }
 
-    // Append canon entry (model produces full ### [DEVELOPING] formatted entry)
+    // Append canon entry (model produces full ### {Title} formatted entry)
     if (canonAdditionToWrite) {
       await this.canonManager.appendEntry(canonAdditionToWrite);
     }
@@ -310,6 +310,48 @@ export class GMEngine {
     return chronicle;
   }
 
+
+  /**
+   * Chapterize: summarize the current RECENT HISTORY into a numbered chapter,
+   * save it to world/chapters.json, then move the entries to DEEP HISTORY.
+   */
+  async processChapterize({ game }) {
+    const [canon, facts, seed] = await Promise.all([
+      this.ws.readCanon(),
+      this.ws.readFacts(),
+      this.ws.readSeed(),
+    ]);
+    const { recent } = this.ws.parseSections(canon);
+    const entries = recent.split(/(?=### )/).filter(s => s.trim());
+    if (!entries.length) {
+      return { success: false, reason: 'No canon entries to chapterize' };
+    }
+    const chaptersData = await this.ws.readChaptersJson();
+    const nextNumber = (chaptersData.chapters?.length ?? 0) + 1;
+    const messages = this.promptBuilder.buildChapterizePrompt({
+      seed, facts,
+      canonEntries: entries.join('\n\n'),
+      chapterNumber: nextNumber,
+      game,
+    });
+    let gmResponse;
+    try {
+      gmResponse = await this.modelClient.chatJson(messages, { temperature: 0.4, maxTokens: 600 });
+    } catch (err) {
+      throw new Error(`GM chapterize call failed: ${err.message}`);
+    }
+    const chapter = {
+      number: nextNumber,
+      title: gmResponse.chapter_title ?? `Chapter ${nextNumber}`,
+      summary: gmResponse.chapter_summary ?? '',
+      created_at: Math.floor(Date.now() / 1000),
+    };
+    await this.ws.appendChapterJson(chapter);
+    // Move chapterized entries to DEEP HISTORY and clear RECENT HISTORY
+    await this.ws.appendToDeepHistory(recent);
+    await this.ws.replaceRecentHistory('');
+    return { success: true, chapter };
+  }
   /** Write run status — always called by gm.js at the end of a run */
   async writeStatus(payload) {
     return await this._statusWriter.write(payload);

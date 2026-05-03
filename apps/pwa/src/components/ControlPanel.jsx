@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Octokit } from '@octokit/rest';
 
 const CANDIDATE_MODELS = [
   { id: 'openai/gpt-5.4',                  label: 'GPT-5.4' },
@@ -49,9 +48,9 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   const [verifyStatus, setVerifyStatus] = useState('idle'); // idle | ok | fail
   const [showNotes, setShowNotes] = useState(false);
   const [showFacts, setShowFacts] = useState(false);
-  const [showLockPanel, setShowLockPanel] = useState(false);
   const [msg, setMsg] = useState('');
   const [showInviteForm, setShowInviteForm] = useState(false);
+  const [chapterizing, setChapterizing] = useState(false);
   const [inviteLetterBody, setInviteLetterBody] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
 
@@ -136,6 +135,18 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
       setMsg('Trigger failed — check your GitHub token has workflow permissions.');
     }
   }
+  async function triggerChapterize() {
+    if (!confirm('Chapterize the current canon entries? This will summarize them into a numbered chapter and archive the individual entries into deep history.')) return;
+    setChapterizing(true);
+    setMsg('Chapterize triggered. Refreshing in a minute…');
+    const ok = await dispatchGM('chapterize');
+    if (ok) {
+      setTimeout(() => { onRefresh(); setMsg(''); }, 60000);
+    } else {
+      setMsg('Trigger failed — check your GitHub token has workflow permissions.');
+    }
+    setChapterizing(false);
+  }
 
    async function sendInvite() {
      if (!passphrase) { setMsg('Enter passphrase first.'); return; }
@@ -195,38 +206,9 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
   // Canon word count
   const canonWords = (data?.canon ?? '').split(/\s+/).filter(Boolean).length;
 
-  // [DEVELOPING] entries available to promote
-  const developingEntries = (data?.canon ?? '')
-    .split('\n')
-    .filter(l => l.startsWith('### [DEVELOPING]'))
-    .map(l => l.replace(/^### \[DEVELOPING\]\s*/, '').trim());
 
-  async function promoteToLocked(entryTitle) {
-    if (!passphrase) { setMsg('Enter passphrase first.'); return; }
-    try {
-      const octokit = new Octokit({ auth: session.githubToken });
-      const { repoOwner: owner, repoName: repo } = session;
-      const res = await octokit.repos.getContent({ owner, repo, path: 'world/canon.md' });
-      const current = atob(res.data.content.replace(/\n/g, ''));
-      const escaped = entryTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const updated = current.replace(
-        new RegExp(`### \\[DEVELOPING\\] ${escaped}`, 'g'),
-        `### [LOCKED] ${entryTitle}`,
-      );
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path: 'world/canon.md',
-        message: `canon: lock entry "${entryTitle}"`,
-        content: btoa(unescape(encodeURIComponent(updated))),
-        sha: res.data.sha,
-      });
-      setMsg(`"${entryTitle}" is now locked.`);
-      onRefresh();
-    } catch (e) {
-      setMsg('Failed to lock entry: ' + e.message);
-    }
-  }
+  // Chapter count
+  const chapterCount = (data?.worldChapters?.chapters ?? []).length;
 
   async function archiveGame() {
     if (!confirm('Archive this game? The GitHub repository will become read-only. Letters can no longer be sent or processed.')) return;
@@ -475,32 +457,17 @@ export function ControlPanel({ session, data, workerUrl, onRefresh, onChronicle 
           </div>
         )}
 
-        {developingEntries.length > 0 && (
-          <>
-            <button className="control-btn" onClick={() => setShowLockPanel(!showLockPanel)}>
-              {showLockPanel ? 'Hide Canon Lock' : `Lock Canon Entries (${developingEntries.length})`}
-            </button>
-            {showLockPanel && (
-              <div style={{ padding: '8px 0' }}>
-                <p style={{ fontSize: 12, color: 'var(--faded)', marginBottom: 8, lineHeight: 1.5 }}>
-                  Promote a <code>[DEVELOPING]</code> entry to <code>[LOCKED]</code> — the GM will treat it as immutable canon.
-                </p>
-                {developingEntries.map(title => (
-                  <div key={title} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <span style={{ fontSize: 13 }}>{title}</span>
-                    <button
-                      className="btn-ghost"
-                      style={{ fontSize: 12, padding: '4px 8px' }}
-                      disabled={!passphrase}
-                      onClick={() => promoteToLocked(title)}
-                    >
-                      Lock
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+        <button
+          className="control-btn"
+          onClick={triggerChapterize}
+          disabled={chapterizing || !session.githubToken}
+        >
+          {chapterizing ? 'Chapterizing…' : `Chapterize Current Entries${chapterCount > 0 ? ` → Chapter ${chapterCount + 1}` : ''}`}
+        </button>
+        {chapterCount > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--faded)', marginTop: -4, marginBottom: 4 }}>
+            {chapterCount} chapter{chapterCount !== 1 ? 's' : ''} archived
+          </div>
         )}
 
         <button className="control-btn" onClick={triggerChronicle}>Generate Chronicle</button>
