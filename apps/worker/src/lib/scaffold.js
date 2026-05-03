@@ -61,7 +61,7 @@ export function buildGameScaffold({ gameJson, engineJson, founderId, founderChar
   return files;
 }
 
-function buildGmScript() {
+export function buildGmScript() {
   return `#!/usr/bin/env node
 import { GMEngine } from '../engine/index.js';
 import path from 'path';
@@ -116,6 +116,19 @@ async function main() {
     console.log('Chronicle generated.'); return;
   }
 
+  if (TRIGGER === 'chapterize') {
+    console.log('Chapterizing current canon entries...');
+    const result = await engine.processChapterize({ game: gameJson });
+    if (result.success) {
+      console.log(\`Chapter \${result.chapter.number} created: "\${result.chapter.title}"\`);
+      await engine.writeStatus({ trigger: 'chapterize', lettersProcessed: 0, success: true });
+    } else {
+      console.log(\`Chapterize skipped: \${result.reason}\`);
+      await engine.writeStatus({ trigger: 'chapterize', lettersProcessed: 0, success: false, error: result.reason });
+    }
+    return;
+  }
+
   // letter_delivery
   const now = Math.floor(Date.now() / 1000);
   const pending = await ws.listPendingLetters();
@@ -162,6 +175,12 @@ async function main() {
   }
 
   const compressionRan = await engine.summarizeIfNeeded();
+
+  // Nothing to do — skip status update to avoid noisy zero-letter commits.
+  if (processed === 0 && compressionRan === false && lastError === null) {
+    console.log('No letters processed and no compression ran — skipping status update.');
+    return;
+  }
   await engine.writeStatus({
     trigger: 'letter_delivery', lettersProcessed: processed,
     success: !lastError, error: lastError,
@@ -208,8 +227,16 @@ on:
   workflow_dispatch:
     inputs:
       trigger:
-        description: 'letter_delivery | seed_generation | finalization | player_joined'
+        description: 'Trigger type'
+        required: true
         default: 'letter_delivery'
+        type: choice
+        options:
+          - letter_delivery
+          - chapterize
+          - seed_generation
+          - finalization
+          - player_joined
       player_id:
         description: 'Player ID — required for the player_joined trigger'
         default: ''
