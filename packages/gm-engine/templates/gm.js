@@ -155,6 +155,12 @@ async function main() {
   const compressionRan = await engine.summarizeIfNeeded();
   if (compressionRan) console.log('Canon compression ran.');
 
+  // If nothing happened at all, skip writing status (avoids a noisy commit with 0 letters).
+  if (processed === 0 && compressionRan === false && lastError === null) {
+    console.log('No letters processed and no compression ran — skipping status update.');
+    return;
+  }
+
   await engine.writeStatus({
     trigger: 'letter_delivery',
     lettersProcessed: processed,

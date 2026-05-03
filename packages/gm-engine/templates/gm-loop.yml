@@ -5,8 +5,16 @@ on:
   workflow_dispatch:
     inputs:
       trigger:
-        description: 'letter_delivery | seed_generation | finalization | player_joined'
+        description: 'Trigger type'
+        required: true
         default: 'letter_delivery'
+        type: choice
+        options:
+          - letter_delivery
+          - chapterize
+          - seed_generation
+          - finalization
+          - player_joined
       player_id:
         description: 'Player ID — required for the player_joined trigger'
         default: ''
