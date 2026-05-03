@@ -127,15 +127,29 @@ export default function App() {
     !showChronicle;
 
   // Mark letters seen when on letters tab — but ONLY after data has finished
-  // loading. Without the `!loading && data` guard the effect fires immediately
-  // on mount (data = null, unreadCount = 0, condition is true) and stamps
-  // lastSeenRef with "now", causing ALL existing letters to appear already-seen
-  // when data finally arrives, so the announcement never shows.
+  // loading AND there are no unread letters left (i.e. the user has already
+  // gone through the announcement flow and markLettersSeen() cleared the count).
+  // Stripping announcementDismissed from the condition means a "Read later"
+  // dismissal does NOT immediately stamp the seen timestamp — the badge stays
+  // as a reminder until the user explicitly opens the letters.
   useEffect(() => {
-    if (!loading && data && tab === 'letters' && (unreadCount === 0 || announcementDismissed)) {
+    if (!loading && data && tab === 'letters' && unreadCount === 0) {
       markLettersSeen();
     }
-  }, [tab, unreadCount, announcementDismissed, markLettersSeen, loading, data]);
+  }, [tab, unreadCount, markLettersSeen, loading, data]);
+
+  // Re-show the announcement whenever the user returns to the app (tab becomes
+  // visible) and there are still unread letters — covers both "app open in
+  // background" and "tapped a push notification" scenarios.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && unreadCount > 0) {
+        setAnnouncementDismissed(false);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [unreadCount]);
 
   // Register push notifications silently in the background
   usePushNotifications(session);
@@ -355,10 +369,13 @@ export default function App() {
              markLettersSeen();
              handleSetTab('letters');
            }}
-           onDismiss={() => {
-             setAnnouncementDismissed(true);
-             markLettersSeen();
-           }}
+            onDismiss={() => {
+              setAnnouncementDismissed(true);
+              // Do NOT call markLettersSeen() here — the user said "read later",
+              // so the badge and highlights must persist until they actually open
+              // the letters.  The visibilitychange listener will re-show the
+              // announcement the next time they return to the app.
+            }}
          />
        )}
      </div>

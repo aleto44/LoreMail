@@ -1,35 +1,45 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * useLettersBadge
  *
- * Tracks unread delivered letters (received since last time the Letters tab
- * was viewed) and keeps the PWA app-icon badge in sync via the Badge API.
+ * Tracks unread delivered letters and keeps the PWA app-icon badge in sync.
  *
- * Storage key: `last_seen_letters_<gameId>` — unix timestamp, written when
+ * Storage key: `last_seen_letters_<gameId>` — unix timestamp written when
  * markLettersSeen() is called.
  *
  * Returns:
- *   unreadCount     — number of delivered letters newer than lastSeen
- *   markLettersSeen — call this when the user opens the Letters tab
+ *   unreadCount     — drops to 0 when markLettersSeen() is called (state-driven)
+ *   newLetters      — frozen at first data load; used for per-letter highlights
+ *                     and is NOT wiped by markLettersSeen()
+ *   markLettersSeen — call this when the user has actually opened the Letters tab
  */
 export function useLettersBadge(session, deliveredLetters) {
-  const gameId  = session?.gameId;
+  const gameId   = session?.gameId;
   const playerId = session?.playerId;
   const key = gameId ? `last_seen_letters_${gameId}` : null;
 
-  // Read once at mount and freeze — badge stays until next session per spec
-  const lastSeenRef = useRef(
+  // Read once at mount and freeze — determines which letters were "new" on entry
+  const lastSeenAtMount = useRef(
     key ? (parseInt(localStorage.getItem(key) ?? '0', 10) || 0) : 0,
   );
 
-  const newLetters = deliveredLetters
-    ? deliveredLetters.filter(
-        l => l.to === playerId && l.deliverAt > lastSeenRef.current,
-      )
-    : [];
+  // newLetters: frozen at the first render that has deliveredLetters.
+  // Subsequent markLettersSeen() calls do NOT affect this — highlights persist
+  // until the user reloads / re-mounts.
+  const newLettersFrozenRef = useRef(null);
+  if (newLettersFrozenRef.current === null && deliveredLetters != null) {
+    newLettersFrozenRef.current = deliveredLetters.filter(
+      l => l.to === playerId && l.deliverAt > lastSeenAtMount.current,
+    );
+  }
+  const newLetters = newLettersFrozenRef.current ?? [];
 
-  const unreadCount = newLetters.length;
+  // seen: becomes true when markLettersSeen() is called.
+  // unreadCount is derived from it so a single setState zeroes the badge
+  // without mutating the frozen newLetters array.
+  const [seen, setSeen] = useState(false);
+  const unreadCount = seen ? 0 : newLetters.length;
 
   // Keep the app-icon badge in sync whenever unread count changes
   useEffect(() => {
@@ -45,7 +55,7 @@ export function useLettersBadge(session, deliveredLetters) {
     if (!key) return;
     const now = Math.floor(Date.now() / 1000);
     localStorage.setItem(key, String(now));
-    lastSeenRef.current = now;
+    setSeen(true);
     if ('clearAppBadge' in navigator) {
       navigator.clearAppBadge().catch(() => {});
     }
