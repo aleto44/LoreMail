@@ -45,7 +45,8 @@ export class WorldState {
 
   /** Parse canon into { deep, recent } section text only, no headers */
   parseSections(canonText) {
-    const deepMatch = canonText.match(/## DEEP HISTORY\n\*\[.*?\]\*\n\n([\s\S]*?)(?=\n---\n## RECENT HISTORY|$)/);
+    // rebuildCanon uses \n\n---\n\n between sections, so use that as the boundary
+    const deepMatch = canonText.match(/## DEEP HISTORY\n\*\[.*?\]\*\n\n([\s\S]*?)(?=\n\n---\n\n## RECENT HISTORY|$)/);
     const recentMatch = canonText.match(/## RECENT HISTORY\n\*\[.*?\]\*\n\n([\s\S]*)$/);
     return {
       deep: deepMatch ? deepMatch[1].trim() : '',

@@ -347,8 +347,8 @@ export class GMEngine {
       created_at: Math.floor(Date.now() / 1000),
     };
     await this.ws.appendChapterJson(chapter);
-    // Move chapterized entries to DEEP HISTORY and clear RECENT HISTORY
-    await this.ws.appendToDeepHistory(recent);
+    // Entries are now captured in the chapter summary — clear RECENT HISTORY
+    // without copying verbatim entries into DEEP HISTORY (avoids redundant noise).
     await this.ws.replaceRecentHistory('');
     return { success: true, chapter };
   }
