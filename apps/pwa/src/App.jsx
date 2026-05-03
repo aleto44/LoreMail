@@ -201,6 +201,13 @@ export default function App() {
         inviteToken={inviteToken}
         workerUrl={WORKER_URL}
         onJoined={(sess) => {
+          // The player already read the invite letter during the join flow, so
+          // pre-stamp the "last seen" watermark to now.  This prevents the
+          // invite letter from triggering the NewLetterAnnouncement popup once
+          // the main app mounts and useLettersBadge initialises for the first
+          // time with this gameId.
+          const seenKey = `last_seen_letters_${sess.gameId}`;
+          localStorage.setItem(seenKey, String(Math.floor(Date.now() / 1000)));
           saveSession(sess);
           // Start polling so the welcome letter appears as soon as the
           // worker/CI finishes committing it (up to 8 retries × 3 s = 24 s).
