@@ -45,12 +45,9 @@ export class WorldState {
 
   /** Parse canon into { deep, recent } section text only, no headers */
   parseSections(canonText) {
-    const deepMatch = canonText.match(
-      /## DEEP HISTORY\n\*\[.*?\]\*\n([\s\S]*?)(?=\n*---\n*## RECENT HISTORY|$)/
-    );
-    const recentMatch = canonText.match(
-      /## RECENT HISTORY\n\*\[.*?\]\*\n([\s\S]*)$/
-    );
+    // rebuildCanon uses \n\n---\n\n between sections, so use that as the boundary
+    const deepMatch = canonText.match(/## DEEP HISTORY\n\*\[.*?\]\*\n\n([\s\S]*?)(?=\n\n---\n\n## RECENT HISTORY|$)/);
+    const recentMatch = canonText.match(/## RECENT HISTORY\n\*\[.*?\]\*\n\n([\s\S]*)$/);
     return {
       deep: deepMatch ? deepMatch[1].trim() : '',
       recent: recentMatch ? recentMatch[1].trim() : '',
@@ -59,37 +56,7 @@ export class WorldState {
 
   /** Rebuild canon.md from deep and recent section content */
   rebuildCanon(deep, recent) {
-    const deepBlock = deep?.trim() ?? '';
-    const recentBlock = recent?.trim() ?? '';
-    return [
-      '## DEEP HISTORY',
-      '*[summarized — compressed from earlier records]*',
-      '',
-      deepBlock,
-      '',
-      '---',
-      '',
-      '## RECENT HISTORY',
-      '*[verbatim — last recorded entries]*',
-      '',
-      recentBlock,
-      '',
-    ].join('\n');
-  }
-
-  /**
-   * Atomic chapterize: moves all RECENT HISTORY entries into DEEP HISTORY
-   * and clears RECENT HISTORY. Single read, single write.
-   * Returns the recent content that was moved, so the caller can use it
-   * for chapter summary generation.
-   */
-  async chapterizeCanon() {
-    const current = await this.readCanon();
-    const { deep, recent } = this.parseSections(current);
-    const newDeep = deep ? `${deep}\n\n${recent}` : recent;
-    const rebuilt = this.rebuildCanon(newDeep, '');
-    await this.writeFile('world/canon.md', rebuilt);
-    return recent;
+    return `## DEEP HISTORY\n*[summarized — compressed from earlier records]*\n\n${deep}\n\n---\n\n## RECENT HISTORY\n*[verbatim — last recorded entries]*\n\n${recent}\n`;
   }
 
   /**

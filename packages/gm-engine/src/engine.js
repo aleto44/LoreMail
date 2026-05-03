@@ -321,43 +321,35 @@ export class GMEngine {
       this.ws.readFacts(),
       this.ws.readSeed(),
     ]);
-
-    // Read recent content before modifying the file
     const { recent } = this.ws.parseSections(canon);
     const entries = recent.split(/(?=### )/).filter(s => s.trim());
     if (!entries.length) {
       return { success: false, reason: 'No canon entries to chapterize' };
     }
-
     const chaptersData = await this.ws.readChaptersJson();
     const nextNumber = (chaptersData.chapters?.length ?? 0) + 1;
-
     const messages = this.promptBuilder.buildChapterizePrompt({
       seed, facts,
       canonEntries: entries.join('\n\n'),
       chapterNumber: nextNumber,
       game,
     });
-
     let gmResponse;
     try {
       gmResponse = await this.modelClient.chatJson(messages, { temperature: 0.4, maxTokens: 600 });
     } catch (err) {
       throw new Error(`GM chapterize call failed: ${err.message}`);
     }
-
     const chapter = {
       number: nextNumber,
       title: gmResponse.chapter_title ?? `Chapter ${nextNumber}`,
       summary: gmResponse.chapter_summary ?? '',
       created_at: Math.floor(Date.now() / 1000),
     };
-
     await this.ws.appendChapterJson(chapter);
-
-    // Single atomic operation — one read, one write
-    await this.ws.chapterizeCanon();
-
+    // Entries are now captured in the chapter summary — clear RECENT HISTORY
+    // without copying verbatim entries into DEEP HISTORY (avoids redundant noise).
+    await this.ws.replaceRecentHistory('');
     return { success: true, chapter };
   }
   /** Write run status — always called by gm.js at the end of a run */

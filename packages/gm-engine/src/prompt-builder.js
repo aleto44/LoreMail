@@ -395,7 +395,7 @@ Your only output is a JSON object. No preamble, no markdown fences.`;
     if (facts?.trim()) blocks.push(`ESTABLISHED FACTS\n─────────────────\n${facts}`);
     blocks.push(`CANON ENTRIES TO SUMMARIZE INTO CHAPTER ${chapterNumber}\n${'─'.repeat(52)}\n${canonEntries}`);
     blocks.push(`Write Chapter ${chapterNumber} of the world chronicle.
-Produce a short title (3–6 words) and a summary paragraph (3–5 sentences) that captures the essential events, turning points, and consequences of this period. Write for players — make it engaging and informative. Chronicle voice: third person, past tense, spare and precise.
+Produce a short title (3–6 words) and a summary (2–4 paragraphs, ~50–100 words each) that captures the essential events, turning points, and consequences of this period. Use multiple paragraphs for readability — separate distinct topics or scenes with paragraph breaks (blank lines). Write for players — make it engaging and informative. Chronicle voice: third person, past tense, spare and precise.
 Respond with JSON only:
 {
   "chapter_title": string,

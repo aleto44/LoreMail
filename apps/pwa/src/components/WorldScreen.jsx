@@ -546,16 +546,16 @@ export function WorldScreen({ data, loading, worldTab, setWorldTab, session, onR
             </div>
           ) : null}
 
-          {/* Chapters — newest first */}
-          {[...(worldChapters.chapters ?? [])].reverse().map(ch => (
-            <div key={ch.number} className="chapter-card">
-              <div className="chapter-card-header">
-                <span className="chapter-card-number">Chapter {ch.number}</span>
-                <span className="chapter-card-title">{ch.title}</span>
-              </div>
-              <div className="chapter-card-summary">{ch.summary}</div>
-            </div>
-          ))}
+           {/* Chapters — newest first */}
+           {[...(worldChapters.chapters ?? [])].reverse().map(ch => (
+             <div key={ch.number} className="chapter-card">
+               <div className="chapter-card-header">
+                 <span className="chapter-card-number">Chapter {ch.number}</span>
+                 <span className="chapter-card-title">{ch.title}</span>
+               </div>
+               <div className="chapter-card-summary"><ReactMarkdown>{ch.summary}</ReactMarkdown></div>
+             </div>
+           ))}
 
           {eventLines && (
             <div className="world-events">

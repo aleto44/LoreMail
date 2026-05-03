@@ -839,6 +839,12 @@ textarea { resize: vertical; min-height: 120px; }
   color: var(--ink);
   opacity: 0.85;
 }
+.chapter-card-summary p {
+  margin: 0 0 12px 0;
+}
+.chapter-card-summary p:last-child {
+  margin-bottom: 0;
+}
 /* ── Character cards ── */
 .character-card {
   background: var(--card);
