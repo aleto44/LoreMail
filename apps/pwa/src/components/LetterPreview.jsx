@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 function EnvelopeSVG({ opening }) {
   return (
@@ -35,21 +35,10 @@ function EnvelopeSVG({ opening }) {
 }
 
 export function LetterPreview({ letter, data, onOpen, isSent, isNew, isRead }) {
-  const [opening, setOpening] = useState(isRead ?? false);
-
-  // Update if isRead changes (e.g. merging server state after render)
-  useEffect(() => {
-    if (isRead && !opening) setOpening(true);
-  }, [isRead]);
+  const [opening, setOpening] = useState(false);
 
   const handleClick = () => {
-    if (opening) {
-      // Envelope is already open (letter was previously read) — go straight to content.
-      // Guard against mid-animation clicks: only navigate if it was pre-opened (isRead),
-      // not if the animation just started this session.
-      if (isRead) onOpen(letter);
-      return;
-    }
+    if (opening) return; // animation already in progress
     setOpening(true);
     // After animation completes, open the letter
     setTimeout(() => onOpen(letter), 750);
