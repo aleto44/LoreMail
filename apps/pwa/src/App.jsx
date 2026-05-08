@@ -102,7 +102,7 @@ export default function App() {
   const { data, loading, refresh, patchData } = useGameData(session);
 
   // Unread-letter badge (app icon + tab indicator)
-  const { unreadCount, newLetters, markLetterRead, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters);
+  const { unreadCount, newLetters, readIds, markLetterRead, markLettersSeen } = useLettersBadge(session, data?.deliveredLetters, data?.serverReadIds, WORKER_URL);
 
   // ── New-letter announcement ───────────────────────────────
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
@@ -337,6 +337,7 @@ export default function App() {
              loading={loading}
              onReadLetter={handleReadLetter}
              newLetters={newLetters}
+             readIds={readIds}
            />
          )}
         {tab === 'world' && (

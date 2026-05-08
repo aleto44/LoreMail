@@ -26,6 +26,7 @@ export function buildGameScaffold({ gameJson, engineJson, founderId, founderChar
 
   files[`players/${founderId}/character.md`] = `# ${founderCharacterName}\n\n${founderCharacterBio}`;
   files[`players/${founderId}/location.md`] = founderCharacterLocation || `Unknown`;
+  files[`players/${founderId}/read-receipts.json`] = JSON.stringify({ v: 1, readIds: [] }, null, 2);
 
   files['letters/.gitkeep'] = '';
   files['letters/pending/.gitkeep'] = '';

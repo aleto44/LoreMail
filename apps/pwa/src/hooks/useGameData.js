@@ -109,6 +109,7 @@ async function fetchGameData(session) {
     factionsRaw,
     timelineRaw,
     chaptersRaw,
+    readReceiptsRaw,
   ] = await Promise.all([
     getContent('config/game.json'),
     getContent('config/engine.json'),
@@ -126,11 +127,25 @@ async function fetchGameData(session) {
     worldGet('factions.json'),
     worldGet('timeline.json'),
     worldGet('chapters.json'),
+    getContent(`players/${playerId}/read-receipts.json`),
   ]);
 
   const game = gameJsonRaw ? JSON.parse(gameJsonRaw) : null;
   const engine = engineJsonRaw ? JSON.parse(engineJsonRaw) : null;
   const gmStatus = statusRaw ? JSON.parse(statusRaw) : null;
+
+  // readReceiptsRaw is null when the file doesn't exist (404)
+  // undefined signals "file missing" to useLettersBadge (triggers watermark bootstrap)
+  let serverReadIds; // intentionally undefined — signals "file missing"
+  if (readReceiptsRaw !== null) {
+    serverReadIds = new Set();
+    try {
+      const parsed = JSON.parse(readReceiptsRaw);
+      if (Array.isArray(parsed?.readIds)) {
+        serverReadIds = new Set(parsed.readIds);
+      }
+    } catch { /* malformed file — return empty Set */ }
+  }
 
   // Strip the founder's seed-prompt inputs from the game objects
   // These fields (flavour, era, tone) are internal world-setup details that players
@@ -232,6 +247,7 @@ async function fetchGameData(session) {
     worldFactions: factionsRaw ? JSON.parse(factionsRaw) : { factions: [] },
     worldTimeline: timelineRaw ? JSON.parse(timelineRaw) : { entries: [] },
     worldChapters: chaptersRaw ? JSON.parse(chaptersRaw) : { chapters: [] },
+    serverReadIds,   // Set<string> | undefined
   };
 }
 

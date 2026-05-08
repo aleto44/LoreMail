@@ -18,6 +18,7 @@ import { handleGetVapidKey, handlePushSubscribe } from './routes/push-subscribe.
 import { handlePushNotify } from './routes/push-notify.js';
 import { handlePushSelfTest } from './routes/push-self-test.js';
 import { handleUpdateEngine } from './routes/update-engine.js';
+import { handleReadReceipts } from './routes/read-receipts.js';
 import { corsHeaders, handleCors } from './lib/cors.js';
 
 export default {
@@ -50,6 +51,7 @@ export default {
       else if (method === 'POST' && path === '/push/notify')    response = await handlePushNotify(request, env);
       else if (method === 'POST' && path === '/push/self-test') response = await handlePushSelfTest(request, env);
       else if (method === 'POST' && path === '/game/update-engine') response = await handleUpdateEngine(request, env);
+      else if (method === 'PATCH' && path === '/letters/read-receipts') response = await handleReadReceipts(request, env);
       else response = json({ error: 'Not found' }, 404);
     } catch (err) {
       console.error('Worker error:', err);

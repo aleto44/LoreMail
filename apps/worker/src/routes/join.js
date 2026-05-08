@@ -41,6 +41,15 @@ export async function handleJoin(request, env) {
     `join: ${playerId} location`,
   );
 
+  await createFile(
+    game.githubToken,
+    game.repoOwner,
+    game.repoName,
+    `players/${playerId}/read-receipts.json`,
+    JSON.stringify({ v: 1, readIds: [] }, null, 2),
+    `join: ${playerId} read-receipts`,
+  );
+
   // Mark invite used
   await env.KV.put(`invite:${inviteToken}`, JSON.stringify({ ...invite, used: true }));
 

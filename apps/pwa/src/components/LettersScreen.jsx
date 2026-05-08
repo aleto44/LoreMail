@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LetterPreview } from './LetterPreview.jsx';
 
-export function LettersScreen({ session, data, loading, onReadLetter, newLetters = [] }) {
+export function LettersScreen({ session, data, loading, onReadLetter, newLetters = [], readIds = new Set() }) {
   const [copied, setCopied] = useState(false);
 
   // Build a Set of new letter IDs for O(1) lookup
@@ -47,6 +47,7 @@ export function LettersScreen({ session, data, loading, onReadLetter, newLetters
                 data={data}
                 onOpen={onReadLetter}
                 isNew={newLetterIds.has(letter.id)}
+                isRead={readIds.has(letter.id)}
               />
               <div className="letter-row-time">{letter.arrivedLabel}</div>
             </div>

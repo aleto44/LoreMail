@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function EnvelopeSVG({ opening }) {
   return (
@@ -34,8 +34,13 @@ function EnvelopeSVG({ opening }) {
   );
 }
 
-export function LetterPreview({ letter, data, onOpen, isSent, isNew }) {
-  const [opening, setOpening] = useState(false);
+export function LetterPreview({ letter, data, onOpen, isSent, isNew, isRead }) {
+  const [opening, setOpening] = useState(isRead ?? false);
+
+  // Update if isRead changes (e.g. merging server state after render)
+  useEffect(() => {
+    if (isRead && !opening) setOpening(true);
+  }, [isRead]);
 
   const handleClick = () => {
     if (opening) return;
