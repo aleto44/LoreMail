@@ -1225,7 +1225,7 @@ function ne(a) {
 function re(a, e) {
   ne(a), ee(e);
 }
-re([{"revision":"e29a9fc8384f741309eb3962ba81c71e","url":"registerSW.js"},{"revision":"d74f93442cdad18859bd07870fd014ed","url":"index.html"},{"revision":null,"url":"assets/index-DlC_-Rf3.js"},{"revision":null,"url":"assets/index-CEQLdgsg.css"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"icon.svg"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"apple-touch-icon.svg"},{"revision":"5df1c94f897199cabb3fe5be4f0ef6fa","url":"manifest.webmanifest"}]);
+re([{"revision":"e29a9fc8384f741309eb3962ba81c71e","url":"registerSW.js"},{"revision":"6ea4ce81d76a92c8d5bd1e57c6d8854a","url":"index.html"},{"revision":null,"url":"assets/index-CEQLdgsg.css"},{"revision":null,"url":"assets/index-B66N_aOR.js"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"icon.svg"},{"revision":"098714eb0746ab53cd5c5e6cb0045279","url":"apple-touch-icon.svg"},{"revision":"5df1c94f897199cabb3fe5be4f0ef6fa","url":"manifest.webmanifest"}]);
 ae();
 self.addEventListener("push", (a) => {
   var r, i, c;
