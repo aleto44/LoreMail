@@ -43,7 +43,13 @@ export function LetterPreview({ letter, data, onOpen, isSent, isNew, isRead }) {
   }, [isRead]);
 
   const handleClick = () => {
-    if (opening) return;
+    if (opening) {
+      // Envelope is already open (letter was previously read) — go straight to content.
+      // Guard against mid-animation clicks: only navigate if it was pre-opened (isRead),
+      // not if the animation just started this session.
+      if (isRead) onOpen(letter);
+      return;
+    }
     setOpening(true);
     // After animation completes, open the letter
     setTimeout(() => onOpen(letter), 750);
